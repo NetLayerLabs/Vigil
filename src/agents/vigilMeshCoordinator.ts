@@ -9,7 +9,7 @@ import {
   FaultScenarioId,
   IncidentAlertWebhook,
   PatchVerificationResult,
-} from '../services/checkoutSandbox.js';
+} from '../services/checkoutTarget.js';
 import {
   DEFAULT_RELEASE_POLICY,
   ReleaseGateDecision,
@@ -416,7 +416,11 @@ export class VigilMeshCoordinator {
       `- **Status:** ACTIVE (Escalated to \`#${this.teamPrefix}-hotfix\`)`,
       `- **Service:** \`${alert.service}\` (\`${alert.deployedVersion}\`, LKG: \`${alert.lastKnownGoodVersion}\`)`,
       `- **Endpoint:** \`${alert.endpoint}\` -> HTTP \`${alert.httpStatus}\` (\`${alert.errorRatePct}%\` error rate, p99 \`${alert.p99LatencyMs}ms\`)`,
-      `- **Suspected Commit:** \`${alert.suspectedCommit.sha}\` by \`${alert.suspectedCommit.author}\` — *"${alert.suspectedCommit.message}"* (\`${alert.suspectedCommit.filePath}:${alert.suspectedCommit.line}\`)`,
+      `- **Suspected Commit (git HEAD of live working copy):** \`${alert.suspectedCommit.sha}\` by \`${alert.suspectedCommit.author}\` — *"${alert.suspectedCommit.message}"* (\`${alert.suspectedCommit.filePath}:${alert.suspectedCommit.line}\`)`,
+      `- **Stack Trace (from service alert webhook):**`,
+      '```',
+      alert.stackTrace.split('\n').slice(0, 6).join('\n'),
+      '```',
       `- **Primary Exception:** \`${alert.errorMessage}\``,
       `- **Reproduction Payload:** \`${JSON.stringify(alert.reproductionPayload)}\``,
     ].join('\n');
@@ -473,7 +477,7 @@ export class VigilMeshCoordinator {
       [
         `@${patcherHandle}${external ? ` @${coder}` : ''} **[ESCALATE ${alert.incidentId} scenario=${alert.scenarioId} mode=${record.patchMode}]**`,
         external
-          ? `@${coder}: you hold \`patch-author\` for this incident. Reproduce with the payload below against \`${this.opts.checkoutService.getBaseUrl()}/api/checkout\`, write the minimal fix, then hand the unified diff to @${patcherHandle} as a \`\`\`diff block in this room (or \`POST /api/incidents/${alert.incidentId}/stage-patch\`). @${patcherHandle} verifies it as \`red-team-verifier\`.`
+          ? `@${coder}: you hold \`patch-author\` for this incident. Reproduce with the payload below against \`${this.opts.checkoutService.getBaseUrl()}/api/checkout\`, then fix it in the live working copy \`${this.opts.checkoutService.getWorkDir()}\` (HEAD is the regression commit). Hand off either by editing the files there and posting \`@${patcherHandle} verify ${alert.incidentId}\`, or by posting your unified diff in a \`\`\`diff block addressed to @${patcherHandle} (or \`POST /api/incidents/${alert.incidentId}/stage-patch\`). @${patcherHandle} verifies with the real test suite as \`red-team-verifier\`.`
           : `Reproduce & stage surgical fix for \`${alert.service}\` (\`${alert.deployedVersion}\`):`,
         `- **Exception:** \`${alert.errorMessage}\``,
         `- **Suspect:** \`${alert.suspectedCommit.sha}\` at \`${alert.suspectedCommit.filePath}:${alert.suspectedCommit.line}\``,
@@ -655,8 +659,35 @@ export class VigilMeshCoordinator {
         }
 
         await this.patcherClient.assumeRole(hotfixRoomId, 'patch-author');
-        const verification = this.opts.checkoutService.reproduceAndStagePatch(incidentId, scenarioId);
+        await this.patcherClient.postMessage(
+          hotfixRoomId,
+          `🔧 **[${incidentId} PATCHING]** Holding \`patch-author\`. Reproducing against live \`checkout-api\`, then \`git revert\` of the regression commit in the working copy, real test suite, and a staging-port replay of the production payload…`,
+        );
+        const verification = await this.opts.checkoutService.reproduceAndStagePatch(incidentId, scenarioId);
         await this.completeVerificationAndHandoff(incidentId, verification, hotfixRoomId);
+        return;
+      }
+
+      // External coder edited the working copy in place and asks for verification: `verify INC-xxxx`
+      const verifyCmd = body.match(/\bverify\b(?:\s+(INC-[0-9A-Z-]+))?/i);
+      if (verifyCmd && !/```/.test(body)) {
+        const cited = verifyCmd[1]?.toUpperCase();
+        const active = (cited && this.incidents.get(cited)) || this.getActiveIncident();
+        if (!active || active.resolvedAt !== null) {
+          await this.patcherClient.postMessage(event.room_id, `No open incident to verify.`);
+          return;
+        }
+        const author = event.payload.sender_name || event.payload.sender;
+        await this.patcherClient.assumeRole(this.roomsByRole.hotfixRoomId, 'red-team-verifier').catch(() => undefined);
+        await this.patcherClient.postMessage(
+          event.room_id,
+          `📥 **[${active.incidentId} VERIFY REQUESTED]** by \`${author}\`. Picking up uncommitted edits in \`${this.opts.checkoutService.getWorkDir()}\`, committing the candidate, running the real test suite and a staging replay…`,
+        );
+        const verification = await this.opts.checkoutService.stageExternalPatch(active.incidentId, active.scenarioId, {
+          diffUnified: '',
+          author,
+        });
+        await this.completeVerificationAndHandoff(active.incidentId, verification, this.roomsByRole.hotfixRoomId);
         return;
       }
 
@@ -674,7 +705,7 @@ export class VigilMeshCoordinator {
           event.room_id,
           `📥 **[${active.incidentId} CANDIDATE RECEIVED]** from \`${author}\` (${event.payload.sender}). Running reproduction + regression matrix as \`red-team-verifier\`…`,
         );
-        const verification = this.opts.checkoutService.stageExternalPatch(active.incidentId, active.scenarioId, {
+        const verification = await this.opts.checkoutService.stageExternalPatch(active.incidentId, active.scenarioId, {
           diffUnified: fence[1],
           author,
         });
@@ -714,7 +745,7 @@ export class VigilMeshCoordinator {
       hotfixRoomId,
       `📥 **[${rec.incidentId} CANDIDATE RECEIVED via stage-patch API]** author=\`${author}\`. Running reproduction + regression matrix as \`red-team-verifier\`…`,
     );
-    const verification = this.opts.checkoutService.stageExternalPatch(rec.incidentId, rec.scenarioId, {
+    const verification = await this.opts.checkoutService.stageExternalPatch(rec.incidentId, rec.scenarioId, {
       diffUnified: submission.diffUnified,
       author,
       touchedFiles: submission.touchedFiles,
@@ -741,7 +772,7 @@ export class VigilMeshCoordinator {
     const reportMarkdown = [
       `# Patch Verification Report — ${incidentId}`,
       `- **Author:** \`${verification.author}\` (${external ? 'external coding agent via Switch' : 'vigil-patcher'}) · **Verifier:** \`${this.patcherClient.agentName}\``,
-      `- **Candidate Version:** \`${verification.candidateVersion}\` (${verification.changedLines} lines across \`${verification.touchedFiles.join(', ') || 'n/a'}\`)`,
+      `- **Candidate Version:** \`${verification.candidateVersion}\` · commit \`${verification.candidateSha ?? 'discarded'}\` (${verification.changedLines} lines across \`${verification.touchedFiles.join(', ') || 'n/a'}\`)`,
       `- **Deterministic Reproduction:** ${verification.reproConfirmed ? 'CONFIRMED' : 'FAILED'} — \`${verification.reproErrorOutput}\``,
       `- **Verdict:** ${verification.allPassed ? `GREEN ${passed}/${total}` : `RED ${passed}/${total} — not eligible for promotion`}`,
       '',
@@ -750,8 +781,13 @@ export class VigilMeshCoordinator {
       verification.diffUnified,
       '```',
       '',
-      '## Regression Matrix',
+      '## Verification Matrix (real `node --test` run + staging-port replay)',
       ...verification.testMatrix.map((t) => `- [${t.passed ? 'x' : ' '}] **${t.name}** — ${t.detail}`),
+      '',
+      '## Test Runner Output (tail)',
+      '```',
+      verification.testRunOutput.trim().split('\n').slice(-25).join('\n'),
+      '```',
     ].join('\n');
 
     await this.patcherClient.createRoomDocument(hotfixRoomId, {
@@ -786,8 +822,8 @@ export class VigilMeshCoordinator {
       hotfixRoomId,
       [
         `🔬 **[${incidentId} REPRODUCED & PATCH VERIFIED]**${external ? ` — candidate authored by \`${verification.author}\`` : ''}`,
-        `1. **Reproduced on \`v2.14.0\`:** \`${verification.reproErrorOutput}\``,
-        `2. **Staged Candidate \`${verification.candidateVersion}\`** (${verification.changedLines} lines changed in \`${verification.touchedFiles[0] ?? 'n/a'}\`):`,
+        `1. **Reproduced against live \`checkout-api\`:** \`${verification.reproErrorOutput}\``,
+        `2. **Staged Candidate \`${verification.candidateVersion}\`** (commit \`${verification.candidateSha ?? 'n/a'}\`, ${verification.changedLines} lines changed in \`${verification.touchedFiles[0] ?? 'n/a'}\`; working copy HEAD, not yet deployed):`,
         '```diff',
         verification.diffUnified,
         '```',
@@ -1077,6 +1113,12 @@ export class VigilMeshCoordinator {
         }
 
         // Approved by verified human! Apply release/rollback & run live HTTP synthetic canary probes
+        await this.releaseGateClient.postMessage(
+          event.room_id,
+          decision.action === 'promote'
+            ? `🚀 **[${active.incidentId} DEPLOYING]** Restarting \`checkout-api\` from verified candidate commit \`${active.patchVerification?.candidateSha ?? 'HEAD'}\` (\`${active.patchVerification?.candidateVersion}\`), then 5 live canary probes…`
+            : `⏪ **[${active.incidentId} ROLLING BACK]** \`git reset --hard ${active.alert.lastKnownGoodVersion}\` in the working copy and restarting \`checkout-api\`, then 5 live canary probes…`,
+        );
         const outcome = await this.opts.checkoutService.applyApprovedRelease(decision.action);
         active.canaryReport = outcome.canaryReport;
         active.finalVersion = outcome.deployedVersion;
@@ -1113,7 +1155,7 @@ export class VigilMeshCoordinator {
         await this.releaseGateClient.postMessage(
           releasesRoomId,
           [
-            `🚀 **[${active.incidentId} ${decision.action === 'promote' ? 'HOTFIX PROMOTED' : 'ROLLED BACK'} -> \`${outcome.deployedVersion}\`]**`,
+            `🚀 **[${active.incidentId} ${decision.action === 'promote' ? 'HOTFIX PROMOTED' : 'ROLLED BACK'} -> \`${outcome.deployedVersion}\` @ \`${outcome.sha}\`]**`,
             `- **Authorized By:** \`${event.payload.sender_name}\` (\`${event.payload.sender}\`)`,
             `- **Synthetic Canary Probes:** **${outcome.canaryReport.probesPassed}/${outcome.canaryReport.probesRun} \`200 OK\`** (max \`${outcome.canaryReport.maxLatencyMs}ms\`)`,
             `- **Audit Trail:** Saved room document \`postmortem-${active.incidentId.toLowerCase()}\`. Notifying \`#${this.teamPrefix}-incidents\`.`,
