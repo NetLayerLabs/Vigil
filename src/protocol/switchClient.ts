@@ -30,6 +30,8 @@ export interface SwitchAgentClientOptions {
   clientVersion?: string;
   onTrace?: (trace: ProtocolWireTrace) => void;
   reconnectDelayMs?: number;
+  /** Resume from a known cursor (failover / standby takeover) instead of `head`. */
+  initialCursor?: number;
 }
 
 export type MessageEventHandler = (
@@ -73,6 +75,8 @@ export class SwitchAgentClient {
   private reconnectTimer: NodeJS.Timeout | null = null;
   private messageHandlers: MessageEventHandler[] = [];
   private discoveredOps: Record<string, { description: string; input_schema: unknown }> = {};
+  /** Chaos flag: a hung client keeps its socket open but stops answering pings and ignores events. */
+  private hung = false;
 
   constructor(opts: SwitchAgentClientOptions) {
     this.baseUrl = opts.baseUrl.replace(/\/+$/, '');
@@ -87,6 +91,21 @@ export class SwitchAgentClient {
     this.clientVersion = opts.clientVersion ?? '1.0.0';
     this.onTrace = opts.onTrace;
     this.reconnectDelayMs = opts.reconnectDelayMs ?? 750;
+    this.cursor = Math.max(0, opts.initialCursor ?? 0);
+  }
+
+  /**
+   * Chaos hook: simulate a wedged agent process. The WebSocket stays open but the client stops
+   * answering `ping` and ignores events, so the server either evicts it on heartbeat lapse or a
+   * standby reopening the same `connection_id` takes it over (`evicted: taken_over`).
+   */
+  public simulateHang(): void {
+    this.hung = true;
+    this.emitTrace('outbound', 'chaos:hang', 'Client wedged: pings unanswered, events ignored', {});
+  }
+
+  public isHung(): boolean {
+    return this.hung;
   }
 
   /**
@@ -215,6 +234,10 @@ export class SwitchAgentClient {
 
         // 1. LIVENESS FIRST: Answer every `ping` synchronously before any slow event work!
         if ('type' in parsed && parsed.type === 'ping') {
+          if (this.hung) {
+            this.emitTrace('inbound', 'ping', `Server ping ignored (client hung, cursor=${this.cursor})`, parsed);
+            return;
+          }
           const pong: SwitchPongFrame = { type: 'pong', cursor: this.cursor };
           if (socket.readyState === WebSocket.OPEN) {
             socket.send(JSON.stringify(pong));
@@ -353,6 +376,7 @@ export class SwitchAgentClient {
   }
 
   private handleDomainFrame(frame: SwitchDomainEventFrame): void {
+    if (this.hung) return;
     // Cursors only move forward monotonically
     if (frame.id > this.cursor) {
       this.cursor = frame.id;
@@ -387,7 +411,7 @@ export class SwitchAgentClient {
   }
 
   private scheduleReconnect(): void {
-    if (this.reconnectTimer || this.stoppedPermanently || this.closingIntentionally) {
+    if (this.reconnectTimer || this.stoppedPermanently || this.closingIntentionally || this.hung) {
       return;
     }
     this.reconnectTimer = setTimeout(() => {
@@ -523,6 +547,43 @@ export class SwitchAgentClient {
 
   public async loadInternalDocuments(roomId: string): Promise<SwitchRoomDocument[]> {
     return this.callOperation<SwitchRoomDocument[]>('load_internal_documents', { room_id: roomId });
+  }
+
+  /** Widen who may address this agent (`owner_only` | `owner_and_owner_agents` | `anyone`). Needs no connection. */
+  public async updateAddressing(
+    addressing: 'owner_only' | 'owner_and_owner_agents' | 'anyone',
+  ): Promise<unknown> {
+    return this.callOperation('update_agent_detail', { agent_id: this.agentId, addressing });
+  }
+
+  public async createRoom(input: {
+    name: string;
+    description?: string;
+    instructions?: string;
+    bridge?: string | null;
+    channel_type?: 'channel_public' | 'channel_private';
+    agents?: string[];
+    users?: string[];
+    roles?: Array<{ name: string; instructions: string; exclusive: boolean }>;
+    documents?: Array<{ name: string; description: string; instructions: string; content: string }>;
+  }): Promise<SwitchRoomDetail> {
+    return this.callOperation<SwitchRoomDetail>('create_room', input);
+  }
+
+  public async linkRooms(fromRoomId: string, toRoomId: string, label: string): Promise<SwitchRoomLink> {
+    return this.callOperation<SwitchRoomLink>('link_rooms', {
+      from_room_id: fromRoomId,
+      to_room_id: toRoomId,
+      label,
+    });
+  }
+
+  public async archiveRoom(roomId: string): Promise<SwitchRoomDetail> {
+    return this.callOperation<SwitchRoomDetail>('archive_room', { room_id: roomId });
+  }
+
+  public async inviteAgentToRoom(roomId: string, agentName: string): Promise<unknown> {
+    return this.callOperation('invite_agent_to_room', { room_id: roomId, agent_name: agentName });
   }
 
   public async listLinkedRooms(roomId: string): Promise<SwitchRoomLink[]> {
