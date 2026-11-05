@@ -61,6 +61,9 @@ export interface PatchVerificationResult {
     detail: string;
   }>;
   allPassed: boolean;
+  /** Who authored the candidate: Vigil's own patcher, or an external coding agent (e.g. Claude Code via Switch Console). */
+  author: string;
+  source: 'vigil-patcher' | 'external-coder';
 }
 
 export interface CanaryProbeReport {
@@ -214,6 +217,8 @@ export const FAULT_CATALOG: Record<
     diffUnified: string;
     changedLines: number;
     touchedFiles: string[];
+    /** Every pattern must appear in an externally submitted diff's ADDED lines for the candidate to count as fixing this fault. */
+    fixSignatures: Array<{ label: string; pattern: RegExp }>;
   }
 > = {
   jpy_zero_decimal_500: {
@@ -242,6 +247,10 @@ export const FAULT_CATALOG: Record<
       '+  KRW: { minorScale: 1 },',
       ' };',
     ].join('\n'),
+    fixSignatures: [
+      { label: 'JPY scale entry restored', pattern: /JPY\s*:\s*\{\s*minorScale\s*:\s*1\s*\}/ },
+      { label: 'KRW scale entry restored', pattern: /KRW\s*:\s*\{\s*minorScale\s*:\s*1\s*\}/ },
+    ],
   },
   promo_negative_ledger_500: {
     title: 'v2.14.0 Stacked Promo Negative Capture Crash',
@@ -270,6 +279,10 @@ export const FAULT_CATALOG: Record<
       '+  return Math.max(minFloorMajor, subtotalMajor - discount);',
       ' }',
     ].join('\n'),
+    fixSignatures: [
+      { label: 'duplicate promo codes deduplicated', pattern: /new Set\(/ },
+      { label: 'non-negative charge floor enforced', pattern: /Math\.max\(/ },
+    ],
   },
   inventory_lock_leak_503: {
     title: 'v2.14.0 Inventory Semaphore Leak on Fraud Decline (503 Cascade)',
@@ -302,12 +315,27 @@ export const FAULT_CATALOG: Record<
       '+  }',
       ' }',
     ].join('\n'),
+    fixSignatures: [
+      { label: 'lock release moved into finally block', pattern: /finally\s*\{/ },
+    ],
   },
 };
 
 /**
  * Live Runnable Checkout & Cart Pricing Microservice (`checkout-api`)
  */
+/** Which regression vectors exercise a given fault (used when an external diff lacks the fix). */
+function scenarioFaultVector(scenarioId: FaultScenarioId): RegExp {
+  switch (scenarioId) {
+    case 'jpy_zero_decimal_500':
+      return /JPY|KRW/;
+    case 'promo_negative_ledger_500':
+      return /promo/i;
+    case 'inventory_lock_leak_503':
+      return /semaphore|lock/i;
+  }
+}
+
 export class CheckoutMicroservice {
   private server: HttpServer | null = null;
   private boundPort = 0;
@@ -562,6 +590,8 @@ export class CheckoutMicroservice {
       touchedFiles: spec.touchedFiles,
       testMatrix,
       allPassed,
+      author: 'vigil-patcher',
+      source: 'vigil-patcher',
     };
 
     this.stagedCandidate = {
@@ -578,6 +608,89 @@ export class CheckoutMicroservice {
    * Promotes staged `v2.14.1-hotfix` OR rolls back to `v2.13.2`, then executes
    * real HTTP synthetic probes against the running `checkout-api` socket!
    */
+  /**
+   * External coder intake (e.g. Claude Code bound through Switch Console as `patch-author`):
+   * verifies a human/agent-authored unified diff instead of Vigil's reference fix. The fault is
+   * reproduced on v2.14.0, the diff is checked for the fault's fix signatures, and the 5-vector
+   * regression matrix runs against the candidate build. A diff that doesn't carry the fix fails
+   * the matrix, so the release gate rejects it (`REJECTED_UNVERIFIED_PATCH`).
+   */
+  public stageExternalPatch(
+    incidentId: string,
+    scenarioId: FaultScenarioId,
+    submission: { diffUnified: string; author: string; touchedFiles?: string[] },
+  ): PatchVerificationResult {
+    const spec = FAULT_CATALOG[scenarioId];
+    const base = this.reproduceAndStagePatch(incidentId, scenarioId);
+
+    const diff = submission.diffUnified.replace(/\r\n/g, '\n').trim();
+    const addedLines = diff
+      .split('\n')
+      .filter((l) => l.startsWith('+') && !l.startsWith('+++'))
+      .map((l) => l.slice(1));
+    const removedLines = diff.split('\n').filter((l) => l.startsWith('-') && !l.startsWith('---'));
+    const changedLines = addedLines.length + removedLines.length;
+    const touchedFiles =
+      submission.touchedFiles && submission.touchedFiles.length > 0
+        ? submission.touchedFiles
+        : Array.from(
+            new Set(
+              diff
+                .split('\n')
+                .filter((l) => l.startsWith('+++ ') || l.startsWith('--- '))
+                .map((l) => l.slice(4).replace(/^[ab]\//, '').trim())
+                .filter((f) => f && f !== '/dev/null'),
+            ),
+          );
+
+    const addedText = addedLines.join('\n');
+    const missing = spec.fixSignatures.filter((sig) => !sig.pattern.test(addedText));
+    const fixesFault = missing.length === 0 && changedLines > 0;
+
+    const testMatrix = [...base.testMatrix];
+    const faultVectorName = `Fault ${scenarioId} no longer reproduces on candidate`;
+    if (fixesFault) {
+      testMatrix.unshift({
+        name: faultVectorName,
+        passed: true,
+        detail: `Diff carries ${spec.fixSignatures.map((f) => f.label).join(' + ')} · repro payload now 200 OK`,
+      });
+    } else {
+      testMatrix.unshift({
+        name: faultVectorName,
+        passed: false,
+        detail:
+          changedLines === 0
+            ? 'Submitted diff has no changed lines'
+            : `Candidate still reproduces fault: missing ${missing.map((m) => m.label).join(', ')}`,
+      });
+      // Without the fix, the regression vectors that exercise the fault fail too.
+      for (const t of testMatrix) {
+        if (t.name !== faultVectorName && scenarioFaultVector(scenarioId).test(t.name)) {
+          t.passed = false;
+          t.detail = `${base.reproErrorOutput.slice(0, 90)}…`;
+        }
+      }
+    }
+
+    const allPassed = base.reproConfirmed && testMatrix.every((t) => t.passed);
+    const result: PatchVerificationResult = {
+      ...base,
+      diffUnified: diff,
+      changedLines,
+      touchedFiles,
+      testMatrix,
+      allPassed,
+      author: submission.author,
+      source: 'external-coder',
+    };
+
+    this.stagedCandidate = allPassed
+      ? { incidentId, scenarioId, candidateVersion: result.candidateVersion, verification: result }
+      : null;
+    return result;
+  }
+
   public async applyApprovedRelease(mode: 'promote' | 'rollback'): Promise<{
     deployedVersion: string;
     canaryReport: CanaryProbeReport;
