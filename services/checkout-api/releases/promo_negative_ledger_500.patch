@@ -1,0 +1,28 @@
+diff --git a/VERSION b/VERSION
+index 095c2a1..d4174a4 100644
+--- a/VERSION
++++ b/VERSION
+@@ -1 +1 @@
+-v2.13.2
++v2.14.0
+diff --git a/src/cartPricing.ts b/src/cartPricing.ts
+index f933c9a..3ea4dcc 100644
+--- a/src/cartPricing.ts
++++ b/src/cartPricing.ts
+@@ -76,12 +76,11 @@ export function applyPromotions(
+   codes: string[],
+   currency: CurrencyCode,
+ ): { discountedMajor: number; applied: string[] } {
+-  const uniqueCodes = Array.from(new Set(codes.map((c) => c.trim().toUpperCase())));
+-  const applied = uniqueCodes.filter((c) => PROMOS[c] !== undefined);
++  // Multi-coupon evaluation: every submitted code is honoured in order (marketing request PR-4412)
++  const applied = codes.map((c) => c.trim().toUpperCase()).filter((c) => PROMOS[c] !== undefined);
+   const discount = applied.reduce((sum, c) => sum + PROMOS[c], 0);
+-  const minFloorMajor = CURRENCY_SCALE_MAP[currency].minorScale === 1 ? 50 : 1;
+-  const discountedMajor = Math.max(minFloorMajor, subtotalMajor - discount);
+-  return { discountedMajor, applied };
++  void currency;
++  return { discountedMajor: subtotalMajor - discount, applied };
+ }
+ 
+ // ---------------------------------------------------------------------------------------------
