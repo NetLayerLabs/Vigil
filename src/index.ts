@@ -84,6 +84,10 @@ export async function startVigilRuntime(opts: {
     bridgeName: 'Mattermost',
     creatorUsername: 'priya',
     externalCoderHandle: process.env.SWITCH_CONSOLE_CODER_HANDLE || undefined,
+    patchMode:
+      process.env.VIGIL_PATCH_MODE === 'external' || process.env.VIGIL_PATCH_MODE === 'auto'
+        ? process.env.VIGIL_PATCH_MODE
+        : undefined,
     checkoutService,
     preRegisteredCreds,
     provisionTemplateViaApi: Boolean(embeddedSwitch) || process.env.PROVISION_TEMPLATE === 'true',
@@ -177,6 +181,12 @@ export async function startVigilRuntime(opts: {
       activeIncident: coordinator.getActiveIncident(),
       wireTraces: coordinator.getWireTraces().slice(0, 80),
       roomIds: coordinator.getRoomIds(),
+      patchMode: coordinator.getPatchMode(),
+      externalCoderHandle: coordinator.getExternalCoderHandle(),
+      releasePolicy: coordinator.getReleasePolicy(),
+      policyAudit: coordinator.getPolicyAudit(),
+      failovers: coordinator.getFailovers(),
+      retiredSentinels: coordinator.getRetiredSentinels(),
     };
   };
 
@@ -249,6 +259,91 @@ export async function startVigilRuntime(opts: {
         const alert = await checkoutService.injectFaultRelease(scenarioId);
         broadcastState();
         sendJson(res, 200, { ok: true, alert });
+        return;
+      }
+
+      // Patcher routing: Vigil's own patcher vs. an external coding agent bound through Switch Console
+      if (method === 'POST' && url.pathname === '/api/patch-mode') {
+        const body = (await readJson(req)) as { mode?: string };
+        if (body.mode !== 'auto' && body.mode !== 'external') {
+          sendJson(res, 400, { error: "mode must be 'auto' or 'external'" });
+          return;
+        }
+        coordinator.setPatchMode(body.mode);
+        broadcastState();
+        sendJson(res, 200, { ok: true, patchMode: coordinator.getPatchMode() });
+        return;
+      }
+
+      // External coder intake (Claude Code / Codex / Antigravity): verify a submitted unified diff
+      const stageMatch = url.pathname.match(/^\/api\/incidents\/([^/]+)\/stage-patch$/);
+      if (method === 'POST' && stageMatch) {
+        const incidentId = decodeURIComponent(stageMatch[1]).toUpperCase();
+        const body = (await readJson(req)) as {
+          diffUnified?: string;
+          diff?: string;
+          author?: string;
+          touchedFiles?: string[];
+        };
+        const diff = (body.diffUnified ?? body.diff ?? '').trim();
+        if (!diff) {
+          sendJson(res, 400, { error: 'diffUnified (unified diff text) is required' });
+          return;
+        }
+        try {
+          const verification = await coordinator.stageExternalPatchViaApi(incidentId, {
+            diffUnified: diff,
+            author: body.author,
+            touchedFiles: body.touchedFiles,
+          });
+          broadcastState();
+          sendJson(res, verification.allPassed ? 200 : 422, {
+            ok: verification.allPassed,
+            incidentId,
+            verification,
+            next: verification.allPassed
+              ? `Handed off to #${coordinator.teamPrefix}-releases; a human must reply 'approve ${incidentId} promote'.`
+              : 'Candidate rejected by the regression matrix; submit a corrected diff.',
+          });
+        } catch (err) {
+          sendJson(res, 404, { error: (err as Error).message });
+        }
+        return;
+      }
+
+      // Reference fix for an incident (lets a demo operator paste the known-good diff into the intake form)
+      const refMatch = url.pathname.match(/^\/api\/incidents\/([^/]+)\/reference-fix$/);
+      if (method === 'GET' && refMatch) {
+        const incidentId = decodeURIComponent(refMatch[1]).toUpperCase();
+        const rec = coordinator.getIncidents().find((i) => i.incidentId === incidentId);
+        if (!rec) {
+          sendJson(res, 404, { error: `Unknown incident ${incidentId}` });
+          return;
+        }
+        const spec = FAULT_CATALOG[rec.scenarioId];
+        sendJson(res, 200, {
+          incidentId,
+          scenarioId: rec.scenarioId,
+          filePath: spec.filePath,
+          line: spec.line,
+          reproPayload: spec.reproPayload,
+          diffUnified: spec.diffUnified,
+          fixSignatures: spec.fixSignatures.map((f) => f.label),
+        });
+        return;
+      }
+
+      // Chaos: wedge the incident commander, then fail over to a standby sentinel (same connection_id)
+      if (method === 'POST' && url.pathname === '/api/chaos/crash-sentinel') {
+        const info = coordinator.crashSentinel();
+        broadcastState();
+        sendJson(res, 200, { ok: true, hung: info });
+        return;
+      }
+      if (method === 'POST' && url.pathname === '/api/chaos/failover-sentinel') {
+        const record = await coordinator.failoverSentinel();
+        broadcastState();
+        sendJson(res, 200, { ok: true, failover: record });
         return;
       }
 
@@ -392,6 +487,7 @@ if (isDirectEntry) {
       console.log(`• Observatory & API   : ${runtime.vigilUrl}`);
       console.log(`• Checkout API Target : ${runtime.checkoutUrl}/health`);
       console.log(`• Switch Bridge Mode  : ${runtime.mode.toUpperCase()} (${runtime.switchServerUrl})`);
+      console.log(`• Patch Mode          : ${runtime.coordinator.getPatchMode().toUpperCase()} (external coder handle: @${runtime.coordinator.getExternalCoderHandle()})`);
       console.log('• Connected Agents    : vigil-sentinel, vigil-patcher, vigil-release-gate');
       console.log('• Linked Switch Rooms : #vigil-incidents -> #vigil-hotfix -> #vigil-releases');
       console.log('====================================================================');
