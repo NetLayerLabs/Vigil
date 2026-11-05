@@ -1,4 +1,4 @@
-import { PatchVerificationResult } from '../services/checkoutSandbox.js';
+import { PatchVerificationResult } from '../services/checkoutTarget.js';
 
 export interface ReleaseApprovalAttempt {
   senderParticipantId: string;
