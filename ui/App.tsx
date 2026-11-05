@@ -122,6 +122,8 @@ interface IncidentRecord {
     allPassed: boolean;
     author: string;
     source: 'vigil-patcher' | 'external-coder';
+    candidateSha: string | null;
+    testRunOutput: string;
   } | null;
   workroom: { roomId: string; roomName: string; archived: boolean } | null;
   patchMode: 'auto' | 'external';
@@ -156,10 +158,14 @@ interface ObservatorySnapshot {
   mode: string;
   switchServerUrl: string;
   checkoutBaseUrl: string;
+  checkoutRepo: { workDir: string; log: Array<{ sha: string; author: string; message: string; at: number }> };
   checkoutTelemetry: {
     deployedVersion: string;
     lastKnownGoodVersion: string;
     stagedCandidateVersion: string | null;
+    stagedCandidateSha: string | null;
+    pid: number;
+    windowRequests: number;
     totalRequests: number;
     totalErrors: number;
     errorRatePct: number;
@@ -428,11 +434,15 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
             }`}
           >
             <Activity className="w-3.5 h-3.5" />
-            <span>checkout-api: {telemetry.deployedVersion}</span>
+            <span title="Deployed version reported by the live service process">checkout-api: {telemetry.deployedVersion}</span>
             <span className="opacity-60">|</span>
-            <span>5xx: {telemetry.errorRatePct}%</span>
+            <span title="Measured 60s rolling window">5xx: {telemetry.errorRatePct}%</span>
             <span className="opacity-60">|</span>
-            <span>p99: {telemetry.p99LatencyMs}ms</span>
+            <span title="Measured 60s rolling window">p99: {telemetry.p99LatencyMs}ms</span>
+            <span className="opacity-60">|</span>
+            <span title="Requests in the measured window (synthetic traffic + probes)">{telemetry.windowRequests} req/60s</span>
+            <span className="opacity-60">|</span>
+            <span title="Service process id (changes on every deploy/rollback)">pid {telemetry.pid}</span>
           </div>
 
           <button
@@ -750,6 +760,31 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
               </div>
             </div>
           )}
+          {/* Live working copy: real git history of checkout-api */}
+          <div>
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 mb-2.5">
+              <GitCommit className="w-3.5 h-3.5 text-amber-400" />
+              checkout-api git log (live working copy)
+            </h2>
+            <div className="space-y-1.5 text-[11px] font-mono">
+              {snap.checkoutRepo.log.map((c, idx) => (
+                <div
+                  key={c.sha}
+                  className={`p-2 rounded-lg border ${
+                    idx === 0 ? 'bg-amber-500/10 border-amber-500/35' : 'bg-slate-900/70 border-slate-800'
+                  }`}
+                  title={c.author}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-amber-300">{c.sha}</span>
+                    <span className="text-slate-500 truncate">{c.author.replace(/\s*<.*>$/, '')}</span>
+                  </div>
+                  <div className="text-slate-300 truncate">{c.message}</div>
+                </div>
+              ))}
+            </div>
+            <p className="text-[10px] text-slate-500 mt-1.5 break-all">{snap.checkoutRepo.workDir}</p>
+          </div>
         </aside>
 
         {/* CENTER COLUMN: Live Switch Room Append-Only Message Log & Human Chat Bar */}
@@ -1143,7 +1178,8 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
                       <>
                         <div>
                           <h3 className="font-semibold text-slate-300 mb-1.5">
-                            Staged Surgical Diff ({latestInc.patchVerification.candidateVersion})
+                            Candidate Diff ({latestInc.patchVerification.candidateVersion}
+                            {latestInc.patchVerification.candidateSha ? ` @ ${latestInc.patchVerification.candidateSha}` : ', discarded'})
                           </h3>
                           <pre className="p-3 rounded-lg bg-slate-950 border border-slate-800 font-mono text-[11px] text-emerald-300 overflow-x-auto">
                             {latestInc.patchVerification.diffUnified}
@@ -1177,6 +1213,17 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
                           </div>
                         </div>
                       </>
+                    )}
+
+                    {latestInc.patchVerification && (
+                      <div>
+                        <h3 className="font-semibold text-slate-300 mb-1.5">
+                          Real test run output (node --test, TAP)
+                        </h3>
+                        <pre className="p-3 rounded-lg bg-slate-950 border border-slate-800 font-mono text-[10px] text-slate-400 whitespace-pre-wrap max-h-48 overflow-y-auto">
+                          {latestInc.patchVerification.testRunOutput.trim().split('\n').slice(-20).join('\n')}
+                        </pre>
+                      </div>
                     )}
 
                     {latestInc.gateDecisions.length > 0 && (
