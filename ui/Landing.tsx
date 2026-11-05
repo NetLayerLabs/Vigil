@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ArrowRight, ArrowUpRight, Plus } from 'lucide-react';
 import './landing.css';
+import { VigilMark } from './VigilMark';
 
 const REPO_URL = 'https://github.com/mrnetwork0001/Vigil';
 
@@ -100,15 +101,6 @@ export function Landing({ onLaunch }: { onLaunch: () => void }) {
   const { snap, offline } = useLive();
 
   useReveal(rootRef);
-
-  // Light page background while the landing is mounted (the war room stays dark).
-  useEffect(() => {
-    const prev = document.body.style.background;
-    document.body.style.background = '#f5f5f2';
-    return () => {
-      document.body.style.background = prev;
-    };
-  }, []);
 
   // Sticky header once the hero has scrolled away.
   useEffect(() => {
@@ -991,18 +983,6 @@ function ProofRow({ layer, what, seeded }: { layer: string; what: string; seeded
         <span className={`vl-tag ${seeded ? 'vl-tag--seeded' : 'vl-tag--real'}`}>{seeded ? 'seeded' : 'real'}</span>
       </td>
     </tr>
-  );
-}
-
-function VigilMark() {
-  // A watchtower glyph: base, shaft, lantern, beam.
-  return (
-    <svg viewBox="0 0 40 40" fill="currentColor" aria-hidden="true">
-      <rect x="10" y="33" width="20" height="4" />
-      <polygon points="15,33 25,33 23.5,15 16.5,15" />
-      <rect x="14.5" y="8" width="11" height="6" fill="#17c784" />
-      <polygon points="26,9.5 39,5 39,17 26,12.5" opacity="0.45" fill="#17c784" />
-    </svg>
   );
 }
 
