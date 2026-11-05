@@ -24,7 +24,7 @@ Each incident gets its own ephemeral workroom, created from a template, linked f
 Nothing ships without a human. The gate deterministically rejects agent self-approvals, then a teammate replies "approve INC-2041 promote" in Mattermost. Five synthetic canary probes, a postmortem document, lease released.
 
 **8/**
-Clone, npm test, npm start, click Launch App. Built for @WeMakeDevs_ and @<switch-handle> Track 01.
+Clone, npm test, npm start, click Open the War Room. Built for @WeMakeDevs_ and @<switch-handle> Track 01.
 https://github.com/mrnetwork0001/Vigil #HowISwitch
 
 ## B. LinkedIn post
@@ -39,7 +39,7 @@ Nothing reaches production without a human typing approve. Repo and 30-second se
 
 ## C. 20-second screen recording shot list
 
-1. (0 to 4s) Landing page, click Launch App. The three linked rooms appear on the left with idle leases.
+1. (0 to 4s) Landing page, click Open the War Room. The three linked rooms appear on the left with idle leases.
 2. (4 to 8s) Click "01 JPY Zero-Decimal 500". Watch the sentinel claim incident-commander and the escalation land in #vigil-hotfix.
 3. (8 to 12s) Patch tab: paste the diff into the external intake and submit. The verifier posts the green matrix and hands off to #vigil-releases.
 4. (12 to 16s) Chat bar: send "set max diff 1" then "approve INC-2041 promote". The gate rejects for blast radius; send "set max diff 60" and approve again.
