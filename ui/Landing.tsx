@@ -449,7 +449,7 @@ export function Landing({ onLaunch }: { onLaunch: () => void }) {
               terminal
             </div>
             <pre className="p-5 font-mono text-[13px] leading-relaxed text-slate-200 overflow-x-auto">
-{`$ git clone <repo-url> && cd Vigil
+{`$ git clone https://github.com/mrnetwork0001/Vigil.git && cd Vigil
 $ npm install
 $ npm test        # 4/4 protocol, chaos & gate tests
 $ npm run build
