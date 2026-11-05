@@ -43,4 +43,4 @@ Turn SEV-1 production outages into an auditable, multi-room team workflow in Mat
 >
 > Built over Switch's WebSocket Agent Protocol + v1 YAML Group Templates.
 >
-> Repo & demo: <YOUR_LINK> #HowISwitch
+> Repo & demo: https://github.com/mrnetwork0001/Vigil #HowISwitch
