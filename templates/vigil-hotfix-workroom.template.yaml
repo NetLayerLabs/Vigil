@@ -1,0 +1,53 @@
+# Vigil Ephemeral Hotfix Workroom — Official Switch Room Template (v1)
+#
+# Spins up a dedicated per-incident coder + verifier workroom with a human merge gate.
+version: 1
+
+params:
+  incident_id:
+    type: string
+    label: Incident ID
+    description: Active incident identifier (e.g. INC-2041)
+    pattern: "INC-[0-9A-Z-]+"
+  patcher_agent:
+    type: agent
+    label: Patcher agent
+    description: Coding agent that reproduces the fault and writes the surgical patch
+  gate_agent:
+    type: agent
+    label: Release gate agent
+    description: Gatekeeper agent that verifies tests and enforces human approval
+  bridge:
+    type: bridge
+    default: [Mattermost, Discord, Telegram, Slack, $first]
+  stack_trace:
+    type: string
+    multiline: true
+    label: Fault summary & stack trace
+    description: Paste the stack trace and suspected commit from #vigil-incidents
+
+room:
+  name: "hotfix-{incident_id}"
+  description: "Dedicated hotfix workroom for {incident_id} with deterministic human release gate"
+  bridge: "{bridge}"
+  channel_type: channel_private
+  agents: ["{patcher_agent}", "{gate_agent}"]
+  users: ["{$creator}"]
+  roles:
+    - name: "patch-author"
+      exclusive: true
+      instructions: "Reproduces {incident_id}, authors minimal patch, and runs regression suite."
+    - name: "release-gatekeeper"
+      exclusive: true
+      instructions: "Validates test suite and requires {$creator} explicit approval before promoting."
+  instructions: |
+    Dedicated workroom for incident `{incident_id}`.
+    `@{patcher_agent}` reproduces the stack trace below, commits a minimal fix, and hands off test results to `@{gate_agent}`.
+    Only `{$creator}`'s explicit `approve {incident_id} promote` or `approve {incident_id} rollback` executes production changes.
+
+    Fault Context:
+    {stack_trace}
+
+kickoff: |
+  @{patcher_agent} @{gate_agent} — opening dedicated hotfix room for {incident_id}.
+  @{patcher_agent}: reproduce the fault from room instructions first and post the exact output before patching.
