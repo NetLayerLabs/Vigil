@@ -1,0 +1,27 @@
+diff --git a/VERSION b/VERSION
+index 095c2a1..d4174a4 100644
+--- a/VERSION
++++ b/VERSION
+@@ -1 +1 @@
+-v2.13.2
++v2.14.0
+diff --git a/src/cartPricing.ts b/src/cartPricing.ts
+index f933c9a..fa9e8d1 100644
+--- a/src/cartPricing.ts
++++ b/src/cartPricing.ts
+@@ -136,11 +136,11 @@ export function authorizeCheckout(req: CheckoutRequest, inventoryPool: Inventory
+   }
+ 
+   const reservationId = inventoryPool.acquire(req.cartId);
++  // perf: screen for fraud before entering the pricing block so declined carts skip tax computation
++  if (fraudEngine.isDeclined(req)) {
++    throw new CheckoutError('FraudCheckDeclinedError', `Fraud screen declined cart ${req.cartId}`, 422);
++  }
+   try {
+-    if (fraudEngine.isDeclined(req)) {
+-      throw new CheckoutError('FraudCheckDeclinedError', `Fraud screen declined cart ${req.cartId}`, 422);
+-    }
+-
+     const subtotalMajor = req.items.reduce((sum, it) => sum + it.unitPriceMajor * it.qty, 0);
+     const { discountedMajor, applied } = applyPromotions(subtotalMajor, req.promoCodes ?? [], req.currency);
+     const taxMajor = discountedMajor * TAX_RATE;
