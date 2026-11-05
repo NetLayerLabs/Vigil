@@ -59,7 +59,7 @@ flowchart LR
 Vigil includes an embedded **Spec-Exact Switch Protocol Server** (`src/mock-switch/switchServerHarness.ts`) alongside the live `checkout-api` microservice and the **Vigil War Room Observatory UI**, so judges can verify the full WebSocket protocol and workflow in 30 seconds:
 
 ```bash
-git clone <YOUR_GITHUB_REPO_URL>
+git clone https://github.com/mrnetwork0001/Vigil.git
 cd Vigil
 npm install
 npm test
