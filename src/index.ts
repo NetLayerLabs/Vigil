@@ -4,7 +4,7 @@ import path from 'node:path';
 import { URL } from 'node:url';
 import { WebSocket, WebSocketServer } from 'ws';
 import { SwitchServerHarness } from './mock-switch/switchServerHarness.js';
-import { CheckoutMicroservice, FAULT_CATALOG, FaultScenarioId } from './services/checkoutSandbox.js';
+import { CheckoutMicroservice, FAULT_CATALOG, FaultScenarioId } from './services/checkoutTarget.js';
 import { VigilMeshCoordinator } from './agents/vigilMeshCoordinator.js';
 
 const MIME_TYPES: Record<string, string> = {
@@ -23,6 +23,7 @@ export async function startVigilRuntime(opts: {
   externalSwitchUrl?: string;
   registrationKey?: string;
   teamPrefix?: string;
+  trafficIntervalMs?: number;
 } = {}) {
   const vigilPort = opts.vigilPort ?? Number(process.env.VIGIL_PORT || 4010);
   const checkoutPort = opts.checkoutPort ?? Number(process.env.CHECKOUT_API_PORT || 4020);
@@ -34,7 +35,9 @@ export async function startVigilRuntime(opts: {
   let broadcastState = () => {};
 
   // 1. Start Target Checkout & Cart Pricing Microservice
-  const checkoutService = new CheckoutMicroservice();
+  const checkoutService = new CheckoutMicroservice({
+    trafficIntervalMs: opts.trafficIntervalMs ?? Number(process.env.CHECKOUT_TRAFFIC_INTERVAL_MS || 250),
+  });
   const boundCheckoutPort = await checkoutService.start(checkoutPort);
 
   // 2. Start Embedded Spec-Exact Switch Protocol Server OR attach to live Switch Console Server!
@@ -175,6 +178,7 @@ export async function startVigilRuntime(opts: {
       switchServerUrl,
       checkoutBaseUrl: checkoutService.getBaseUrl(),
       checkoutTelemetry: checkoutService.getTelemetry(),
+      checkoutRepo: { workDir: checkoutService.getWorkDir(), log: await checkoutService.getRepoLog(8) },
       faultCatalog: FAULT_CATALOG,
       switchState: switchSnapshot,
       incidents: coordinator.getIncidents(),
@@ -324,12 +328,23 @@ export async function startVigilRuntime(opts: {
         sendJson(res, 200, {
           incidentId,
           scenarioId: rec.scenarioId,
-          filePath: spec.filePath,
-          line: spec.line,
+          filePath: rec.alert.suspectedCommit.filePath,
+          line: rec.alert.suspectedCommit.line,
           reproPayload: spec.reproPayload,
-          diffUnified: spec.diffUnified,
-          fixSignatures: spec.fixSignatures.map((f) => f.label),
+          // The known-good forward fix is the exact reverse of the deployed regression commit (source files only).
+          diffUnified: await checkoutService.getReferenceFixDiff(),
+          note: 'Reverse of the regression commit in the live working copy; apply with git apply.',
         });
+        return;
+      }
+
+      // Real alert webhook endpoint (the service posts to the target's own collector by default;
+      // this route lets an external monitoring stack raise incidents too).
+      if (method === 'POST' && url.pathname === '/api/webhooks/checkout-alert') {
+        const body = (await readJson(req)) as Parameters<typeof checkoutService.handleAlertWebhook>[0];
+        const alert = await checkoutService.handleAlertWebhook(body);
+        broadcastState();
+        sendJson(res, alert ? 202 : 200, { accepted: Boolean(alert), alert });
         return;
       }
 
@@ -485,7 +500,7 @@ if (isDirectEntry) {
       console.log('⚡ Vigil — Autonomous Incident-to-Hotfix War Room on Switch');
       console.log('====================================================================');
       console.log(`• Observatory & API   : ${runtime.vigilUrl}`);
-      console.log(`• Checkout API Target : ${runtime.checkoutUrl}/health`);
+      console.log(`• Checkout API Target : ${runtime.checkoutUrl}/health (real process, git working copy: ${runtime.checkoutService.getWorkDir()})`);
       console.log(`• Switch Bridge Mode  : ${runtime.mode.toUpperCase()} (${runtime.switchServerUrl})`);
       console.log(`• Patch Mode          : ${runtime.coordinator.getPatchMode().toUpperCase()} (external coder handle: @${runtime.coordinator.getExternalCoderHandle()})`);
       console.log('• Connected Agents    : vigil-sentinel, vigil-patcher, vigil-release-gate');
