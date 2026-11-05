@@ -213,6 +213,9 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
   const [externalDiff, setExternalDiff] = useState<string>('');
   const [externalAuthor, setExternalAuthor] = useState<string>('claude-code');
   const [stageResult, setStageResult] = useState<string>('');
+  // Phones (<= 900px): the left rail becomes a drawer, and one view shows at a time.
+  const [drawerOpen, setDrawerOpen] = useState<boolean>(false);
+  const [mobileView, setMobileView] = useState<'room' | 'inspect'>('room');
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -272,7 +275,28 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [currentRoom?.messages.length]);
 
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setDrawerOpen(false);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [drawerOpen]);
+
+  const openRoom = (roomId: string) => {
+    setSelectedRoomId(roomId);
+    setMobileView('room');
+    setDrawerOpen(false);
+  };
+
+  const openInspector = (tab: 'docs' | 'wire' | 'patch') => {
+    setRightTab(tab);
+    setMobileView('inspect');
+    setDrawerOpen(false);
+  };
+
   const injectChaos = async (scenarioId: string) => {
+    setDrawerOpen(false);
+    setMobileView('room');
     setBusyAction(scenarioId);
     try {
       await fetch('/api/chaos/inject', {
@@ -340,6 +364,8 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
   };
 
   const chaosCall = async (path: string) => {
+    setDrawerOpen(false);
+    setMobileView('room');
     setBusyAction(path);
     try {
       await fetch(path, { method: 'POST' });
@@ -458,12 +484,24 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
         </div>
 
         <div className="wr-top-actions">
-          <button type="button" className="wr-btn" onClick={openTemplatesModal}>
+          <button type="button" className="wr-btn wr-desk" onClick={openTemplatesModal}>
             <Code2 className="wr-ic" />
-            <span className="wr-hide-sm">Switch template</span>
+            <span>Switch template</span>
+          </button>
+          <button
+            type="button"
+            className={`wr-burger ${drawerOpen ? 'is-open' : ''}`}
+            aria-label={drawerOpen ? 'Close rooms and controls' : 'Open rooms and controls'}
+            aria-expanded={drawerOpen}
+            aria-controls="wr-drawer"
+            onClick={() => setDrawerOpen((v) => !v)}
+          >
+            <span />
+            <span />
+            <span />
           </button>
           {onHome && (
-            <button type="button" className="wr-btn wr-btn--dark" onClick={onHome} title="Back to the landing page">
+            <button type="button" className="wr-btn wr-btn--dark wr-desk" onClick={onHome} title="Back to the landing page">
               <ArrowLeft className="wr-ic" />
               <span>Home</span>
             </button>
@@ -473,7 +511,7 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
 
       {/* ───────────── Control bar: chaos releases, patch author, failover ───────────── */}
       <section className="wr-bar" aria-label="Controls">
-        <div className="wr-group">
+        <div className="wr-group wr-group--faults">
           <span className="wr-label">Chaos release</span>
           {FAULTS.map((f) => (
             <button
@@ -491,7 +529,7 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
           ))}
         </div>
 
-        <div className="wr-group">
+        <div className="wr-group wr-desk">
           <span className="wr-label">Patch author</span>
           <div
             className="wr-seg"
@@ -537,6 +575,23 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
           </button>
         </div>
       </section>
+
+      {/* ───────────── Phone view switcher (hidden on desktop) ───────────── */}
+      <nav className="wr-views" aria-label="View">
+        <button type="button" className={mobileView === 'room' ? 'is-on' : ''} onClick={() => setMobileView('room')}>
+          Room
+        </button>
+        <button type="button" className={mobileView === 'inspect' && rightTab === 'docs' ? 'is-on' : ''} onClick={() => openInspector('docs')}>
+          Docs
+        </button>
+        <button type="button" className={mobileView === 'inspect' && rightTab === 'wire' ? 'is-on' : ''} onClick={() => openInspector('wire')}>
+          Protocol
+        </button>
+        <button type="button" className={mobileView === 'inspect' && rightTab === 'patch' ? 'is-on' : ''} onClick={() => openInspector('patch')}>
+          Patch
+          {latestInc && <span className={`wr-sq ${latestInc.canaryReport ? '' : gateInc ? 'wr-sq--warn is-pulse' : 'wr-sq--idle'}`} />}
+        </button>
+      </nav>
 
       {/* ───────────── Human release gate ───────────── */}
       {gateInc && (
@@ -585,6 +640,7 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
               className="wr-btn wr-btn--lg wr-btn--brand"
               onClick={async () => {
                 setSelectedRoomId(snap.roomIds.releasesRoomId);
+                setMobileView('room');
                 await postChatMessage(snap.roomIds.releasesRoomId, `@vigil-release-gate approve ${gateInc.incidentId} promote`);
                 setRightTab('patch');
               }}
@@ -596,9 +652,88 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
         </section>
       )}
 
-      <main className="wr-main">
-        {/* ───────────── Left rail: rooms, agents, failover, git ───────────── */}
-        <aside className="wr-col wr-left">
+      <button
+        type="button"
+        className={`wr-backdrop ${drawerOpen ? 'is-open' : ''}`}
+        aria-label="Close rooms and controls"
+        tabIndex={drawerOpen ? 0 : -1}
+        onClick={() => setDrawerOpen(false)}
+      />
+
+      <main className="wr-main" data-view={mobileView}>
+        {/* ───────────── Left rail: rooms, agents, failover, git (a drawer on phones) ───────────── */}
+        <aside id="wr-drawer" className={`wr-col wr-left ${drawerOpen ? 'is-open' : ''}`}>
+          <div className="wr-drawer-head">
+            <span className="vl-logo wr-home">
+              <VigilMark />
+              Vigil
+            </span>
+            <button type="button" className="wr-drawer-close" aria-label="Close" onClick={() => setDrawerOpen(false)}>
+              <X />
+            </button>
+          </div>
+
+          {/* Controls that live in the top bars on desktop */}
+          <div className="wr-sec wr-mob">
+            <div className="wr-sec-h">
+              <span className="wr-label">
+                <span className="wr-sq wr-sq--violet" />
+                Patch author
+              </span>
+            </div>
+            <div className="wr-seg wr-seg--full">
+              <button
+                type="button"
+                disabled={busy}
+                className={snap.patchMode === 'auto' ? 'is-on' : ''}
+                onClick={() => setPatchMode('auto')}
+              >
+                vigil-patcher
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                className={snap.patchMode === 'external' ? 'is-on is-ext' : ''}
+                onClick={() => setPatchMode('external')}
+              >
+                @{snap.externalCoderHandle}
+              </button>
+            </div>
+            <div className="wr-sec-h" style={{ marginTop: 18 }}>
+              <span className="wr-label">
+                <span className="wr-sq wr-sq--alert" />
+                Incident commander
+              </span>
+            </div>
+            <div className="wr-drawer-grid">
+              <button type="button" className="wr-btn wr-btn--alert" disabled={busy} onClick={() => chaosCall('/api/chaos/crash-sentinel')}>
+                <Skull className="wr-ic" />
+                <span>Crash Sentinel</span>
+              </button>
+              <button type="button" className="wr-btn" disabled={busy} onClick={() => chaosCall('/api/chaos/failover-sentinel')}>
+                <HeartPulse className="wr-ic" />
+                <span>Failover Sentinel</span>
+              </button>
+              <button
+                type="button"
+                className="wr-btn"
+                onClick={() => {
+                  setDrawerOpen(false);
+                  openTemplatesModal();
+                }}
+              >
+                <Code2 className="wr-ic" />
+                <span>Switch template</span>
+              </button>
+              {onHome && (
+                <button type="button" className="wr-btn wr-btn--dark" onClick={onHome}>
+                  <ArrowLeft className="wr-ic" />
+                  <span>Home</span>
+                </button>
+              )}
+            </div>
+          </div>
+
           <div className="wr-sec">
             <div className="wr-sec-h">
               <span className="wr-label">
@@ -612,7 +747,7 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
                 <React.Fragment key={room.id}>
                   <button
                     type="button"
-                    onClick={() => setSelectedRoomId(room.id)}
+                    onClick={() => openRoom(room.id)}
                     className={`wr-room ${currentRoom?.id === room.id ? 'is-sel' : ''} ${room.archived ? 'is-archived' : ''}`}
                   >
                     <div className="wr-room-top">
@@ -1058,7 +1193,7 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
                         <button
                           type="button"
                           className={`wr-tag ${latestInc.workroom.archived ? '' : 'wr-tag--violet'}`}
-                          onClick={() => setSelectedRoomId(latestInc.workroom!.roomId)}
+                          onClick={() => openRoom(latestInc.workroom!.roomId)}
                         >
                           <Archive className="wr-ic" />#{latestInc.workroom.roomName} · {latestInc.workroom.archived ? 'archived' : 'open'}
                         </button>
