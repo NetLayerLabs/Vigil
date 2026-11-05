@@ -1,0 +1,35 @@
+/* ==========================================================================
+   Vigil design tokens, shared by the landing page (.vl) and the war room (.wr).
+   ========================================================================== */
+
+.vl,
+.wr {
+  --bg: #f5f5f2;
+  --panel: #ffffff;
+  --ink: #0a0a0a;
+  --soft: #3a4045;
+  --muted: #6b7378;
+  --line: rgba(10, 10, 10, 0.1);
+  --line-strong: rgba(10, 10, 10, 0.16);
+  --brand: #17c784;
+  --brand-hover: #3ddc9b;
+  --brand-deep: #0a6b45;
+  --brand-wash: #e4f6ee;
+  --alert: #d6293e;
+  --alert-wash: #fbe9eb;
+  --warn: #a8650a;
+  --warn-wash: #fbf1e0;
+  --violet: #6b4fd8;
+  --violet-wash: #efebfc;
+  --code-bg: #0b0f14;
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --pad-x: clamp(20px, 3.5vw, 64px);
+  --sec-y: clamp(72px, 7.5vw, 120px);
+  --mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --sans: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+}
+
+body {
+  background: #f5f5f2;
+  color: #0a0a0a;
+}
