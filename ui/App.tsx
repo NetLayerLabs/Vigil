@@ -1,34 +1,25 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Activity,
-  AlertTriangle,
-  ArrowRight,
-  Bot,
-  CheckCircle2,
+  Archive,
+  ArrowDownRight,
+  ArrowLeft,
   Code2,
   Copy,
-  FileText,
-  Flame,
   GitCommit,
-  Home,
-  Archive,
   HeartPulse,
-  Scale,
-  Skull,
-  Upload,
-  Wrench,
   Lock,
-  Network,
-  Play,
-  Radio,
   RotateCcw,
+  Scale,
   Send,
   ShieldAlert,
-  ShieldCheck,
-  Terminal,
+  Skull,
+  Upload,
   UserCheck,
-  Zap,
+  X,
 } from 'lucide-react';
+import { VigilMark } from './VigilMark';
+import './landing.css';
+import './warroom.css';
 
 interface RoomRole {
   name: string;
@@ -386,11 +377,15 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
 
   if (!snap) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-300">
-        <div className="flex items-center gap-3 font-mono text-sm">
-          <Radio className="w-5 h-5 text-emerald-400 animate-pulse" />
-          Connecting to Vigil Switch Agent Protocol Mesh...
-        </div>
+      <div className="wr wr-loading">
+        <span className="vl-logo">
+          <VigilMark />
+          Vigil
+        </span>
+        <span className="wr-label">
+          <span className="wr-sq is-pulse" />
+          Connecting to the Switch agent mesh
+        </span>
       </div>
     );
   }
@@ -398,532 +393,452 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
   const telemetry = snap.checkoutTelemetry;
   const activeInc = snap.activeIncident;
   const latestInc = activeInc ?? snap.incidents[0] ?? null;
+  const degraded = telemetry.status !== 'healthy';
+  const busy = busyAction !== null;
+  const gateInc = activeInc && activeInc.stage === 'awaiting_human_gate' ? activeInc : null;
+  const gateMatrix = gateInc?.patchVerification?.testMatrix ?? [];
+  const pv = latestInc?.patchVerification ?? null;
+  const policy = snap.releasePolicy;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
-      {/* Top Navigation & Telemetry Header */}
-      <header className="border-b border-slate-800/90 bg-slate-900/75 backdrop-blur px-5 py-3 flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-emerald-500/15 border border-emerald-500/40 flex items-center justify-center">
-            <ShieldCheck className="w-5 h-5 text-emerald-400" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2.5">
-              <h1 className="font-semibold tracking-tight text-base text-white">VIGIL</h1>
-              <span className="text-[11px] font-mono uppercase px-2 py-0.5 rounded bg-slate-800 text-emerald-300 border border-slate-700">
-                Switch War Room Mesh
-              </span>
-              <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">
-                {snap.mode === 'embedded_switch_protocol_server'
-                  ? 'Switch WS Protocol v6 · Embedded Bridge'
-                  : 'Switch Console · Live Bridge'}
-              </span>
-            </div>
-            <p className="text-xs text-slate-400">
-              Autonomous Incident Triage → Surgical Reproduction → Human-Gated Release across Linked Switch Rooms
-            </p>
-          </div>
+    <div className="wr">
+      {/* ───────────── Top bar: brand, live telemetry, actions ───────────── */}
+      <header className="wr-top">
+        <div className="wr-brand">
+          <a
+            href="/"
+            className="vl-logo wr-home"
+            aria-label="Vigil, back to the landing page"
+            onClick={(e) => {
+              if (!onHome || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+              e.preventDefault();
+              onHome();
+            }}
+          >
+            <VigilMark />
+            Vigil
+          </a>
+          <span className="wr-sep" />
+          <span className="wr-label">
+            <b>War room</b>
+          </span>
+          <span className="wr-tag">
+            {snap.mode === 'embedded_switch_protocol_server' ? 'Embedded Switch server' : 'Switch Console · live'}
+          </span>
         </div>
 
-        <div className="flex items-center gap-3 flex-wrap">
-          <div
-            className={`px-3 py-1.5 rounded-lg border text-xs font-mono flex items-center gap-2 ${
-              telemetry.status === 'healthy'
-                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-                : 'bg-rose-500/15 border-rose-500/40 text-rose-300 animate-pulse'
-            }`}
-          >
-            <Activity className="w-3.5 h-3.5" />
-            <span title="Deployed version reported by the live service process">checkout-api: {telemetry.deployedVersion}</span>
-            <span className="opacity-60">|</span>
-            <span title="Measured 60s rolling window">5xx: {telemetry.errorRatePct}%</span>
-            <span className="opacity-60">|</span>
-            <span title="Measured 60s rolling window">p99: {telemetry.p99LatencyMs}ms</span>
-            <span className="opacity-60">|</span>
-            <span title="Requests in the measured window (synthetic traffic + probes)">{telemetry.windowRequests} req/60s</span>
-            <span className="opacity-60">|</span>
-            <span title="Service process id (changes on every deploy/rollback)">pid {telemetry.pid}</span>
-          </div>
+        <div
+          className={`wr-telemetry ${degraded ? 'is-degraded' : ''}`}
+          title="Measured from the live checkout-api process over a rolling 60s window"
+        >
+          <span className="wr-tm wr-tm--status">
+            <span className={`wr-sq ${degraded ? 'wr-sq--alert is-pulse' : ''}`} />
+            {degraded ? 'Degraded' : 'Healthy'}
+          </span>
+          <span className="wr-tm" title="Deployed version reported by the live service process">
+            <small>checkout-api</small>
+            <b>{telemetry.deployedVersion}</b>
+          </span>
+          <span className="wr-tm wr-tm--err">
+            <small>5xx</small>
+            <b>{telemetry.errorRatePct}%</b>
+          </span>
+          <span className="wr-tm">
+            <small>p99</small>
+            <b>{telemetry.p99LatencyMs}ms</b>
+          </span>
+          <span className="wr-tm wr-tm--hide-md" title="Requests in the measured window (synthetic traffic + probes)">
+            <small>req / 60s</small>
+            <b>{telemetry.windowRequests}</b>
+          </span>
+          <span className="wr-tm wr-tm--hide-md" title="Service process id (changes on every deploy or rollback)">
+            <small>pid</small>
+            <b>{telemetry.pid}</b>
+          </span>
+        </div>
 
-          <button
-            onClick={openTemplatesModal}
-            className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-medium text-slate-200 flex items-center gap-1.5 transition"
-          >
-            <Code2 className="w-3.5 h-3.5 text-emerald-400" />
-            Switch YAML Template
+        <div className="wr-top-actions">
+          <button type="button" className="wr-btn" onClick={openTemplatesModal}>
+            <Code2 className="wr-ic" />
+            <span className="wr-hide-sm">Switch template</span>
           </button>
-
           {onHome && (
-            <button
-              onClick={onHome}
-              className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-medium text-slate-200 flex items-center gap-1.5 transition"
-              title="Back to landing page"
-            >
-              <Home className="w-3.5 h-3.5 text-slate-400" />
-              Home
+            <button type="button" className="wr-btn wr-btn--dark" onClick={onHome} title="Back to the landing page">
+              <ArrowLeft className="wr-ic" />
+              <span>Home</span>
             </button>
           )}
         </div>
       </header>
 
-      {/* Chaos Fault Trigger Strip */}
-      <section className="border-b border-slate-800/80 bg-slate-900/40 px-5 py-2.5 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-xs text-slate-300">
-          <Flame className="w-4 h-4 text-amber-400" />
-          <span className="font-medium">Chaos Release Simulator:</span>
-          <span className="text-slate-400 hidden sm:inline">
-            Deploy a buggy <code className="text-amber-300 font-mono">v2.14.0</code> commit to watch Switch agents triage, patch & gate across rooms:
-          </span>
+      {/* ───────────── Control bar: chaos releases, patch author, failover ───────────── */}
+      <section className="wr-bar" aria-label="Controls">
+        <div className="wr-group">
+          <span className="wr-label">Chaos release</span>
+          {FAULTS.map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              className="wr-btn"
+              disabled={busy}
+              onClick={() => injectChaos(f.id)}
+              title={`Commit a real regression to the live checkout-api working copy and restart it on v2.14.0`}
+            >
+              <span className={`wr-sq wr-sq--${f.tone}`} />
+              <span className="wr-num">{f.n}</span>
+              <span>{f.label}</span>
+            </button>
+          ))}
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          <button
-            disabled={busyAction !== null}
-            onClick={() => injectChaos('jpy_zero_decimal_500')}
-            className="px-2.5 py-1.5 rounded-md bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/35 text-rose-200 text-xs font-mono flex items-center gap-1.5 transition disabled:opacity-50"
-          >
-            <Zap className="w-3.5 h-3.5 text-rose-400" />
-            1. JPY Zero-Decimal 500
-          </button>
-          <button
-            disabled={busyAction !== null}
-            onClick={() => injectChaos('promo_negative_ledger_500')}
-            className="px-2.5 py-1.5 rounded-md bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/35 text-amber-200 text-xs font-mono flex items-center gap-1.5 transition disabled:opacity-50"
-          >
-            <Zap className="w-3.5 h-3.5 text-amber-400" />
-            2. Stacked Promo Negative 500
-          </button>
-          <button
-            disabled={busyAction !== null}
-            onClick={() => injectChaos('inventory_lock_leak_503')}
-            className="px-2.5 py-1.5 rounded-md bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/35 text-purple-200 text-xs font-mono flex items-center gap-1.5 transition disabled:opacity-50"
-          >
-            <Lock className="w-3.5 h-3.5 text-purple-400" />
-            3. Inventory Lock Leak 503
-          </button>
-
-          <span className="hidden md:inline-block w-px h-5 bg-slate-700 mx-1" />
-
+        <div className="wr-group">
+          <span className="wr-label">Patch author</span>
           <div
-            className="flex items-center rounded-md border border-slate-700 bg-slate-900 text-[11px] font-mono overflow-hidden"
-            title="Who writes the fix: Vigil's own patcher, or a coding agent you already use (Claude Code / Codex) bound through Switch Console. Vigil verifies either way."
+            className="wr-seg"
+            title="Who writes the fix: Vigil's own patcher, or a coding agent you already use (Claude Code, Codex) bound through Switch Console. Vigil verifies either way."
           >
-            <span className="px-2 py-1.5 text-slate-400 flex items-center gap-1">
-              <Wrench className="w-3 h-3" /> patcher:
-            </span>
             <button
-              disabled={busyAction !== null}
+              type="button"
+              disabled={busy}
+              className={snap.patchMode === 'auto' ? 'is-on' : ''}
               onClick={() => setPatchMode('auto')}
-              className={`px-2 py-1.5 transition ${
-                snap.patchMode === 'auto' ? 'bg-emerald-600 text-white' : 'text-slate-300 hover:bg-slate-800'
-              }`}
             >
               vigil-patcher
             </button>
             <button
-              disabled={busyAction !== null}
+              type="button"
+              disabled={busy}
+              className={snap.patchMode === 'external' ? 'is-on is-ext' : ''}
               onClick={() => setPatchMode('external')}
-              className={`px-2 py-1.5 transition ${
-                snap.patchMode === 'external' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:bg-slate-800'
-              }`}
             >
-              @{snap.externalCoderHandle} (Switch Console)
+              @{snap.externalCoderHandle}
             </button>
           </div>
-
+          <span className="wr-sep" />
           <button
-            disabled={busyAction !== null}
+            type="button"
+            className="wr-btn wr-btn--alert"
+            disabled={busy}
             onClick={() => chaosCall('/api/chaos/crash-sentinel')}
-            className="px-2.5 py-1.5 rounded-md bg-slate-900 hover:bg-slate-800 border border-rose-500/40 text-rose-300 text-xs font-mono flex items-center gap-1.5 transition disabled:opacity-50"
-            title="Wedge the live incident commander: socket stays open, pings go unanswered"
+            title="Wedge the live incident commander: the socket stays open, pings go unanswered"
           >
-            <Skull className="w-3.5 h-3.5" />
-            Crash Sentinel
+            <Skull className="wr-ic" />
+            <span>Crash Sentinel</span>
           </button>
           <button
-            disabled={busyAction !== null}
+            type="button"
+            className="wr-btn"
+            disabled={busy}
             onClick={() => chaosCall('/api/chaos/failover-sentinel')}
-            className="px-2.5 py-1.5 rounded-md bg-slate-900 hover:bg-slate-800 border border-emerald-500/40 text-emerald-300 text-xs font-mono flex items-center gap-1.5 transition disabled:opacity-50"
-            title="Standby sentinel reopens the same connection_id from the last cursor; old socket is evicted with taken_over and the incident-commander lease is re-asserted"
+            title="A standby reopens the same connection_id from the last cursor; the old socket is evicted with taken_over and the incident-commander lease is re-asserted"
           >
-            <HeartPulse className="w-3.5 h-3.5" />
-            Failover Sentinel
+            <HeartPulse className="wr-ic" />
+            <span>Failover Sentinel</span>
           </button>
         </div>
       </section>
 
-      {/* Active Human-in-the-Loop Release Gate Callout */}
-      {activeInc && activeInc.stage === 'awaiting_human_gate' && (
-        <div className="bg-amber-500/10 border-b border-amber-500/40 px-5 py-3 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />
-            <div className="text-xs">
-              <div className="font-semibold text-amber-200">
-                HUMAN SIGN-OFF REQUIRED IN <span className="font-mono">#vigil-releases</span> — {activeInc.incidentId}: {activeInc.title}
-              </div>
-              <div className="text-amber-300/80">
-                Patch <code className="font-mono">{activeInc.patchVerification?.candidateVersion}</code> verified (
-                {activeInc.patchVerification?.testMatrix.length}/{activeInc.patchVerification?.testMatrix.length} green vectors). Deterministic gate blocks AI self-approval; human sign-off required.
-              </div>
-            </div>
+      {/* ───────────── Human release gate ───────────── */}
+      {gateInc && (
+        <section className="wr-gate" aria-live="polite">
+          <div>
+            <span className="wr-label">
+              <span className="wr-sq wr-sq--warn is-pulse" />
+              Human sign-off required in #vigil-releases
+            </span>
+            <p>
+              <b>{gateInc.incidentId}</b> {gateInc.title}. Candidate{' '}
+              <code>{gateInc.patchVerification?.candidateVersion}</code> passed{' '}
+              {gateMatrix.filter((t) => t.passed).length}/{gateMatrix.length} tests and the staging replay. The gate
+              refuses approvals from agent identities.
+            </p>
           </div>
-
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="wr-gate-actions">
             <button
+              type="button"
+              className="wr-btn wr-btn--lg wr-btn--ondark wr-btn--alert"
               onClick={async () => {
                 setSelectedRoomId(snap.roomIds.releasesRoomId);
-                await postChatMessage(
-                  snap.roomIds.releasesRoomId,
-                  `@vigil-release-gate approve ${activeInc.incidentId} promote`,
-                  { username: 'vigil-patcher', displayName: 'vigil-patcher (Rogue Agent Test)' },
-                );
+                await postChatMessage(snap.roomIds.releasesRoomId, `@vigil-release-gate approve ${gateInc.incidentId} promote`, {
+                  username: 'vigil-patcher',
+                  displayName: 'vigil-patcher (Rogue Agent Test)',
+                });
               }}
-              className="px-2.5 py-1.5 rounded-md bg-slate-900 hover:bg-slate-800 border border-rose-500/40 text-rose-300 text-xs font-mono flex items-center gap-1.5 transition"
-              title="Proves that ReleaseSafetyGate deterministically rejects approvals from AI agent identities"
+              title="Proves that the release gate deterministically rejects approvals from AI agent identities"
             >
-              <ShieldAlert className="w-3.5 h-3.5" />
-              Test Rogue Agent Block
+              <ShieldAlert className="wr-ic" />
+              <span>Test Rogue Agent Block</span>
             </button>
-
             <button
+              type="button"
+              className="wr-btn wr-btn--lg wr-btn--ondark"
               onClick={async () => {
                 setSelectedRoomId(snap.roomIds.releasesRoomId);
-                await postChatMessage(
-                  snap.roomIds.releasesRoomId,
-                  `@vigil-release-gate approve ${activeInc.incidentId} promote`,
-                );
+                await postChatMessage(snap.roomIds.releasesRoomId, `@vigil-release-gate approve ${gateInc.incidentId} rollback`);
+              }}
+            >
+              <RotateCcw className="wr-ic" />
+              <span>Rollback to v2.13.2</span>
+            </button>
+            <button
+              type="button"
+              className="wr-btn wr-btn--lg wr-btn--brand"
+              onClick={async () => {
+                setSelectedRoomId(snap.roomIds.releasesRoomId);
+                await postChatMessage(snap.roomIds.releasesRoomId, `@vigil-release-gate approve ${gateInc.incidentId} promote`);
                 setRightTab('patch');
               }}
-              className="px-3 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow transition"
             >
-              <UserCheck className="w-3.5 h-3.5" />
-              Approve & Promote Hotfix (as Priya)
-            </button>
-
-            <button
-              onClick={async () => {
-                setSelectedRoomId(snap.roomIds.releasesRoomId);
-                await postChatMessage(
-                  snap.roomIds.releasesRoomId,
-                  `@vigil-release-gate approve ${activeInc.incidentId} rollback`,
-                );
-              }}
-              className="px-3 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 text-xs font-medium flex items-center gap-1.5 transition"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              Rollback to v2.13.2
+              <UserCheck className="wr-ic" />
+              <span>Approve &amp; Promote as Priya</span>
             </button>
           </div>
-        </div>
+        </section>
       )}
 
-      {/* Main 3-Column War Room Layout */}
-      <main className="flex-1 grid grid-cols-1 lg:grid-cols-12 min-h-0">
-        {/* LEFT COLUMN: Switch Linked Rooms Topology, Role Leases & Connected Agents */}
-        <aside className="lg:col-span-3 border-r border-slate-800/90 bg-slate-900/30 p-4 flex flex-col gap-5 overflow-y-auto">
-          <div>
-            <div className="flex items-center justify-between mb-2.5">
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                <Network className="w-3.5 h-3.5 text-emerald-400" />
-                Linked Switch Rooms
-              </h2>
-              <span className="text-[11px] font-mono text-slate-500">
-                bridge: {snap.switchState.rooms[0]?.bridge ?? 'Mattermost'}
+      <main className="wr-main">
+        {/* ───────────── Left rail: rooms, agents, failover, git ───────────── */}
+        <aside className="wr-col wr-left">
+          <div className="wr-sec">
+            <div className="wr-sec-h">
+              <span className="wr-label">
+                <span className="wr-sq" />
+                Linked Switch rooms
               </span>
+              <span className="wr-tag">{snap.switchState.rooms[0]?.bridge ?? 'Mattermost'}</span>
             </div>
-
-            <div className="space-y-2">
-              {snap.switchState.rooms.map((room, idx) => {
-                const isSelected = currentRoom?.id === room.id;
-                const leasedRoles = room.roles.filter((r) => r.holder_name);
-                return (
-                  <React.Fragment key={room.id}>
-                    <button
-                      onClick={() => setSelectedRoomId(room.id)}
-                      className={`w-full text-left p-3 rounded-xl border transition ${
-                        isSelected
-                          ? 'bg-emerald-500/10 border-emerald-500/50 shadow-sm'
-                          : room.archived
-                            ? 'bg-slate-950/50 hover:bg-slate-900/60 border-slate-800/60 opacity-70'
-                            : 'bg-slate-900/70 hover:bg-slate-800/70 border-slate-800'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <span className={`font-mono text-sm font-semibold ${room.archived ? 'text-slate-500 line-through' : 'text-white'}`}>
-                          #{room.name}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          {room.ephemeral && (
-                            <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border flex items-center gap-1 ${
-                              room.archived
-                                ? 'bg-slate-900 border-slate-700 text-slate-500'
-                                : 'bg-sky-500/15 border-sky-500/40 text-sky-200'
-                            }`}>
-                              <Archive className="w-3 h-3" />
-                              {room.archived ? 'archived' : 'ephemeral'}
-                            </span>
-                          )}
-                          <span className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">
-                            seq:{room.seq}
+            <div className="wr-rooms">
+              {snap.switchState.rooms.map((room, idx) => (
+                <React.Fragment key={room.id}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedRoomId(room.id)}
+                    className={`wr-room ${currentRoom?.id === room.id ? 'is-sel' : ''} ${room.archived ? 'is-archived' : ''}`}
+                  >
+                    <div className="wr-room-top">
+                      <span className="wr-room-name">#{room.name}</span>
+                      <span style={{ display: 'inline-flex', gap: 5 }}>
+                        {room.ephemeral && (
+                          <span className={`wr-tag ${room.archived ? '' : 'wr-tag--violet'}`}>
+                            <Archive className="wr-ic" />
+                            {room.archived ? 'archived' : 'workroom'}
                           </span>
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-400 mt-1 line-clamp-2">{room.description}</p>
-
-                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        )}
+                        <span className="wr-tag">seq {room.seq}</span>
+                      </span>
+                    </div>
+                    <p className="wr-room-desc">{room.description}</p>
+                    {room.roles.length > 0 && (
+                      <div className="wr-roles">
                         {room.roles.map((role) => (
-                          <span
-                            key={role.name}
-                            className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${
-                              role.holder_name
-                                ? 'bg-amber-500/15 border-amber-500/40 text-amber-200'
-                                : 'bg-slate-950/70 border-slate-800 text-slate-500'
-                            }`}
-                          >
-                            {role.exclusive ? '🔒 ' : ''}
+                          <span key={role.name} className={`wr-role ${role.holder_name ? 'is-held' : ''}`}>
+                            {role.exclusive && <Lock className="wr-ic" />}
                             {role.name}: {role.holder_name ?? 'idle'}
                           </span>
                         ))}
                       </div>
-
-                      {leasedRoles.length > 0 && (
-                        <div className="mt-1.5 text-[11px] text-emerald-300 font-mono">
-                          ● Active lease held
-                        </div>
-                      )}
-                    </button>
-
-                    {!room.ephemeral && idx < 2 && (
-                      <div className="flex items-center gap-1.5 pl-4 text-[11px] font-mono text-slate-500">
-                        <ArrowRight className="w-3 h-3 text-emerald-500/70" />
-                        <span className="truncate">
-                          {snap.switchState.links[idx]?.label ?? 'linked room escalation'}
-                        </span>
-                      </div>
                     )}
-                  </React.Fragment>
-                );
-              })}
+                  </button>
+                  {!room.ephemeral && idx < 2 && (
+                    <div className="wr-link">
+                      <ArrowDownRight className="wr-ic" />
+                      <span>{snap.switchState.links[idx]?.label ?? 'linked room escalation'}</span>
+                    </div>
+                  )}
+                </React.Fragment>
+              ))}
             </div>
           </div>
 
-          {/* Connected WebSocket Protocol Teammates */}
-          <div>
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 mb-2.5">
-              <Bot className="w-3.5 h-3.5 text-indigo-400" />
-              Switch WebSocket Agents
-            </h2>
-            <div className="space-y-2">
+          <div className="wr-sec">
+            <div className="wr-sec-h">
+              <span className="wr-label">
+                <span className="wr-sq wr-sq--ink" />
+                Switch WebSocket agents
+              </span>
+              <span className="wr-label">
+                {snap.switchState.agents.filter((a) => a.online).length}/{snap.switchState.agents.length} online
+              </span>
+            </div>
+            <div className="wr-rows">
               {snap.switchState.agents.map((ag) => (
-                <div
-                  key={ag.id}
-                  className="p-2.5 rounded-lg bg-slate-900/70 border border-slate-800 text-xs"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono font-medium text-slate-100 flex items-center gap-1.5">
-                      <span
-                        className={`w-2 h-2 rounded-full ${
-                          ag.online ? 'bg-emerald-400' : 'bg-rose-400'
-                        }`}
-                      />
-                      @{ag.name}
+                <div key={ag.id} className="wr-row">
+                  <div className="wr-row-top">
+                    <span className="wr-row-name">
+                      <span className={`wr-sq ${ag.online ? '' : 'wr-sq--alert'}`} />@{ag.name}
                     </span>
-                    <span className="text-[10px] font-mono text-slate-400">
-                      cursor:{ag.cursor} · gen:{ag.generation ?? '-'}
+                    <span className="wr-row-meta">
+                      cursor {ag.cursor} · gen {ag.generation ?? '-'}
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-400 mt-1">{ag.description}</p>
+                  <p className="wr-row-desc">{ag.description}</p>
                 </div>
               ))}
             </div>
           </div>
 
           {(snap.failovers.length > 0 || snap.retiredSentinels.length > 0) && (
-            <div>
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 mb-2.5">
-                <HeartPulse className="w-3.5 h-3.5 text-rose-400" />
-                Commander Failover Log
-              </h2>
-              <div className="space-y-2 text-[11px] font-mono">
+            <div className="wr-sec">
+              <div className="wr-sec-h">
+                <span className="wr-label">
+                  <span className="wr-sq wr-sq--alert" />
+                  Commander failover log
+                </span>
+              </div>
+              <div className="wr-rows">
                 {snap.retiredSentinels.map((r) => (
-                  <div key={r.connectionId + String(r.generation)} className="p-2.5 rounded-lg bg-slate-900/70 border border-rose-500/30 text-rose-200">
-                    gen {r.generation ?? '-'} · conn {r.connectionId.slice(0, 8)}… · {r.hung ? 'hung' : 'live'} ·{' '}
-                    {r.evicted ? 'evicted: taken_over' : 'awaiting eviction'}
+                  <div key={r.connectionId + String(r.generation)} className="wr-row wr-row--log">
+                    <span className="wr-sq wr-sq--alert" />
+                    <span>
+                      gen {r.generation ?? '-'} · conn {r.connectionId.slice(0, 8)} · {r.hung ? 'hung' : 'live'} ·{' '}
+                      {r.evicted ? 'evicted: taken_over' : 'awaiting eviction'}
+                    </span>
                   </div>
                 ))}
                 {snap.failovers.map((f) => (
-                  <div key={f.at} className="p-2.5 rounded-lg bg-slate-900/70 border border-emerald-500/30 text-emerald-200">
-                    standby gen {f.newGeneration ?? '-'} resumed from cursor {f.resumedFromCursor} · lease{' '}
-                    {f.leaseReclaimed ? 're-asserted' : 'not needed'}
+                  <div key={f.at} className="wr-row wr-row--log">
+                    <span className="wr-sq" />
+                    <span>
+                      standby gen {f.newGeneration ?? '-'} resumed from cursor {f.resumedFromCursor} · lease{' '}
+                      {f.leaseReclaimed ? 're-asserted' : 'not needed'}
+                    </span>
                   </div>
                 ))}
               </div>
             </div>
           )}
-          {/* Live working copy: real git history of checkout-api */}
-          <div>
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 mb-2.5">
-              <GitCommit className="w-3.5 h-3.5 text-amber-400" />
-              checkout-api git log (live working copy)
-            </h2>
-            <div className="space-y-1.5 text-[11px] font-mono">
+
+          <div className="wr-sec">
+            <div className="wr-sec-h">
+              <span className="wr-label">
+                <GitCommit className="wr-ic" />
+                checkout-api git log
+              </span>
+              <span className="wr-label">live copy</span>
+            </div>
+            <div className="wr-rows">
               {snap.checkoutRepo.log.map((c, idx) => (
-                <div
-                  key={c.sha}
-                  className={`p-2 rounded-lg border ${
-                    idx === 0 ? 'bg-amber-500/10 border-amber-500/35' : 'bg-slate-900/70 border-slate-800'
-                  }`}
-                  title={c.author}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-amber-300">{c.sha}</span>
-                    <span className="text-slate-500 truncate">{c.author.replace(/\s*<.*>$/, '')}</span>
+                <div key={c.sha} className={`wr-git ${idx === 0 ? 'is-head' : ''}`} title={c.author}>
+                  <div className="wr-git-top">
+                    <span className="wr-git-sha">{c.sha}</span>
+                    {idx === 0 && <span className="wr-tag wr-tag--ink">HEAD</span>}
+                    <span className="wr-git-author">{c.author.replace(/\s*<.*>$/, '')}</span>
                   </div>
-                  <div className="text-slate-300 truncate">{c.message}</div>
+                  <div className="wr-git-msg">{c.message}</div>
                 </div>
               ))}
             </div>
-            <p className="text-[10px] text-slate-500 mt-1.5 break-all">{snap.checkoutRepo.workDir}</p>
+            <p className="wr-path">{snap.checkoutRepo.workDir}</p>
           </div>
         </aside>
 
-        {/* CENTER COLUMN: Live Switch Room Append-Only Message Log & Human Chat Bar */}
-        <section className="lg:col-span-5 border-r border-slate-800/90 flex flex-col h-[calc(100vh-135px)]">
+        {/* ───────────── Centre: the room's append-only log + chat ───────────── */}
+        <section className="wr-col wr-center">
           {currentRoom && (
             <>
-              <div className="px-4 py-3 border-b border-slate-800/80 bg-slate-900/50 flex items-center justify-between">
+              <div className="wr-roomhead">
                 <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono font-semibold text-sm text-white">
-                      #{currentRoom.name}
-                    </span>
-                    <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300">
-                      {currentRoom.documents.length} room docs
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-400 mt-0.5">{currentRoom.description}</p>
+                  <span className="wr-label">
+                    Switch room · {currentRoom.documents.length} docs
+                    {currentRoom.archived ? ' · archived' : ''}
+                  </span>
+                  <h1 className="wr-roomtitle">#{currentRoom.name}</h1>
+                  <p>{currentRoom.description}</p>
                 </div>
-                <span className="text-[11px] font-mono text-emerald-400">
-                  Append-only log · seq #{currentRoom.seq}
+                <span className="wr-label">
+                  Append-only · seq <b>{currentRoom.seq}</b>
                 </span>
               </div>
 
-              {/* Messages Stream */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              <div className="wr-feed">
+                {currentRoom.messages.length === 0 && (
+                  <div className="wr-empty" style={{ marginTop: 20 }}>
+                    No messages in #{currentRoom.name} yet. Ship a chaos release above to start an incident.
+                  </div>
+                )}
                 {currentRoom.messages.map((m) => {
                   const isAgent = m.sender.startsWith('@switch-agent-');
                   return (
-                    <div
-                      key={m.message_id}
-                      className={`p-3 rounded-xl border text-xs leading-relaxed ${
-                        isAgent
-                          ? 'bg-slate-900/85 border-slate-800'
-                          : 'bg-indigo-950/30 border-indigo-500/35'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-2 mb-1.5">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`px-1.5 py-0.5 rounded text-[10px] font-mono uppercase ${
-                              isAgent
-                                ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
-                                : 'bg-indigo-500/20 text-indigo-200 border border-indigo-500/40'
-                            }`}
-                          >
-                            {isAgent ? 'Agent' : 'Human'}
-                          </span>
-                          <span className="font-semibold text-slate-100">{m.sender_name}</span>
-                          <span className="font-mono text-[10px] text-slate-500">{m.sender}</span>
-                        </div>
-                        <span className="font-mono text-[10px] text-slate-500">seq #{m.seq}</span>
+                    <article key={m.message_id} className={`wr-msg ${isAgent ? '' : 'wr-msg--human'}`}>
+                      <div className="wr-msg-head">
+                        <span className={`wr-tag ${isAgent ? 'wr-tag--ink' : 'wr-tag--brand'}`}>
+                          {isAgent ? 'Agent' : 'Human'}
+                        </span>
+                        <span className="wr-msg-name">{m.sender_name}</span>
+                        <span className="wr-msg-handle">{m.sender}</span>
+                        <span className="wr-msg-seq">#{m.seq}</span>
                       </div>
-                      <pre className="whitespace-pre-wrap font-sans text-slate-200 text-xs overflow-x-auto">
-                        {m.body}
-                      </pre>
-                    </div>
+                      <pre>{m.body}</pre>
+                    </article>
                   );
                 })}
                 <div ref={messagesEndRef} />
               </div>
 
-              {/* Quick Prompts & Team Chat Input */}
-              <form
-                onSubmit={handleSendChat}
-                className="p-3 border-t border-slate-800 bg-slate-900/70 space-y-2"
-              >
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-[10px] font-mono text-slate-400">Quick mention:</span>
-                  <button
-                    type="button"
-                    onClick={() => setChatInput('@vigil-sentinel status')}
-                    className="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
-                  >
+              <form onSubmit={handleSendChat} className="wr-compose">
+                <div className="wr-quick">
+                  <span className="wr-label">Try</span>
+                  <button type="button" className="wr-chipbtn" onClick={() => setChatInput('@vigil-sentinel status')}>
                     @vigil-sentinel status
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setChatInput('@vigil-patcher show diff')}
-                    className="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
-                  >
+                  <button type="button" className="wr-chipbtn" onClick={() => setChatInput('@vigil-patcher show diff')}>
                     @vigil-patcher show diff
                   </button>
                   <button
                     type="button"
+                    className="wr-chipbtn"
                     onClick={() => {
                       setSelectedRoomId(snap.roomIds.releasesRoomId);
                       setChatInput('@vigil-release-gate policy');
                     }}
-                    className="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
                   >
                     @vigil-release-gate policy
                   </button>
                   <button
                     type="button"
+                    className="wr-chipbtn wr-chipbtn--warn"
                     onClick={() => {
                       setSelectedRoomId(snap.roomIds.releasesRoomId);
                       setChatInput('@vigil-release-gate set max diff 1');
                     }}
-                    className="text-[11px] font-mono px-2 py-0.5 rounded bg-amber-500/15 hover:bg-amber-500/25 text-amber-200 border border-amber-500/30"
-                    title="Tighten the room policy from chat so the staged patch gets rejected on the next approval"
+                    title="Tighten the room policy from chat so the staged patch is rejected on the next approval"
                   >
                     set max diff 1
                   </button>
                   {activeInc && (
                     <button
                       type="button"
+                      className="wr-chipbtn wr-chipbtn--brand"
                       onClick={() => {
                         setSelectedRoomId(snap.roomIds.releasesRoomId);
                         setChatInput(`@vigil-release-gate approve ${activeInc.incidentId} promote`);
                       }}
-                      className="text-[11px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30"
                     >
                       approve {activeInc.incidentId} promote
                     </button>
                   )}
                 </div>
-
-                <div className="flex items-center gap-2">
+                <div className="wr-inputrow">
                   <select
+                    className="wr-select"
                     value={operatorHandle}
                     onChange={(e) => setOperatorHandle(e.target.value)}
-                    className="bg-slate-950 border border-slate-700 rounded-lg px-2 py-2 text-xs font-mono text-slate-200"
+                    aria-label="Post as"
                   >
-                    <option value="priya">Priya (Lead)</option>
-                    <option value="sam">Sam (SRE)</option>
+                    <option value="priya">Priya · Lead</option>
+                    <option value="sam">Sam · SRE</option>
                   </select>
                   <input
                     type="text"
+                    className="wr-input"
                     value={chatInput}
                     onChange={(e) => setChatInput(e.target.value)}
-                    placeholder={`Message #${currentRoom.name} as @switch-user-${operatorHandle}...`}
-                    className="flex-1 bg-slate-950 border border-slate-700 focus:border-emerald-500 rounded-lg px-3 py-2 text-xs text-slate-100 outline-none"
+                    placeholder={`Message #${currentRoom.name} as @switch-user-${operatorHandle}`}
+                    aria-label="Message"
                   />
-                  <button
-                    type="submit"
-                    className="px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium flex items-center gap-1.5 transition"
-                  >
-                    <Send className="w-3.5 h-3.5" />
-                    Send
+                  <button type="submit" className="wr-btn wr-btn--dark" disabled={!chatInput.trim()}>
+                    <Send className="wr-ic" />
+                    <span>Send</span>
                   </button>
                 </div>
               </form>
@@ -931,385 +846,400 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
           )}
         </section>
 
-        {/* RIGHT COLUMN: Room-Scoped Documents, Live WebSocket Wire Inspector & Patch/Canary Matrix */}
-        <section className="lg:col-span-4 flex flex-col h-[calc(100vh-135px)] bg-slate-950/60">
-          <div className="border-b border-slate-800 px-3 pt-2 flex items-center gap-1 bg-slate-900/50">
-            <button
-              onClick={() => setRightTab('docs')}
-              className={`px-3 py-2 text-xs font-medium border-b-2 flex items-center gap-1.5 transition ${
-                rightTab === 'docs'
-                  ? 'border-emerald-400 text-emerald-300'
-                  : 'border-transparent text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <FileText className="w-3.5 h-3.5" />
-              Room Docs ({allDocuments.length})
+        {/* ───────────── Right: documents, wire, patch & canary ───────────── */}
+        <section className="wr-col wr-right">
+          <nav className="wr-tabs" aria-label="Inspector">
+            <button type="button" className={`wr-tab ${rightTab === 'docs' ? 'is-on' : ''}`} onClick={() => setRightTab('docs')}>
+              Room Docs <small>{allDocuments.length}</small>
             </button>
-            <button
-              onClick={() => setRightTab('wire')}
-              className={`px-3 py-2 text-xs font-medium border-b-2 flex items-center gap-1.5 transition ${
-                rightTab === 'wire'
-                  ? 'border-emerald-400 text-emerald-300'
-                  : 'border-transparent text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <Terminal className="w-3.5 h-3.5" />
-              WS Protocol ({snap.wireTraces.length})
+            <button type="button" className={`wr-tab ${rightTab === 'wire' ? 'is-on' : ''}`} onClick={() => setRightTab('wire')}>
+              WS Protocol <small>{snap.wireTraces.length}</small>
             </button>
-            <button
-              onClick={() => setRightTab('patch')}
-              className={`px-3 py-2 text-xs font-medium border-b-2 flex items-center gap-1.5 transition ${
-                rightTab === 'patch'
-                  ? 'border-emerald-400 text-emerald-300'
-                  : 'border-transparent text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <GitCommit className="w-3.5 h-3.5" />
-              Patch & Canary
+            <button type="button" className={`wr-tab ${rightTab === 'patch' ? 'is-on' : ''}`} onClick={() => setRightTab('patch')}>
+              Patch &amp; Canary
+              {latestInc && <span className={`wr-sq ${latestInc.canaryReport ? '' : gateInc ? 'wr-sq--warn is-pulse' : 'wr-sq--idle'}`} />}
             </button>
-          </div>
+          </nav>
 
-          <div className="flex-1 overflow-y-auto p-4">
-            {rightTab === 'docs' && (
-              <div className="space-y-3">
-                <div className="flex flex-wrap gap-1.5">
-                  {allDocuments.map((d) => (
-                    <button
-                      key={`${d.roomId}:${d.name}`}
-                      onClick={() => setSelectedDocName(d.name)}
-                      className={`text-[11px] font-mono px-2 py-1 rounded border transition ${
-                        activeDoc?.name === d.name
-                          ? 'bg-emerald-500/15 border-emerald-500/50 text-emerald-200'
-                          : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
-                      }`}
-                    >
-                      {d.name}
-                    </button>
-                  ))}
-                </div>
-
-                {activeDoc && (
-                  <div className="rounded-xl border border-slate-800 bg-slate-900/80 p-3.5 space-y-2">
-                    <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
-                      <span>room: #{activeDoc.roomName}</span>
-                      <span>author: {activeDoc.created_by_name}</span>
-                    </div>
-                    <p className="text-xs text-slate-300">{activeDoc.description}</p>
-                    <pre className="p-3 rounded-lg bg-slate-950 border border-slate-800 font-mono text-[11px] text-slate-200 whitespace-pre-wrap overflow-x-auto">
-                      {activeDoc.content}
-                    </pre>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {rightTab === 'wire' && (
-              <div className="space-y-2">
-                <p className="text-[11px] text-slate-400 mb-2">
-                  Live Switch Agent Protocol frames (<code className="font-mono">connection_state</code>, 2s{' '}
-                  <code className="font-mono">ping/pong</code> cursors, <code className="font-mono">message</code>, and{' '}
-                  <code className="font-mono">X-Switch-Connection-Id</code> ops):
-                </p>
-                {snap.wireTraces.map((t) => (
-                  <div
-                    key={t.id}
-                    className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 font-mono text-[11px]"
+          {rightTab === 'docs' && (
+            <div className="wr-pane">
+              <div className="wr-pills">
+                {allDocuments.map((d) => (
+                  <button
+                    key={`${d.roomId}:${d.name}`}
+                    type="button"
+                    className={`wr-chipbtn ${activeDoc?.name === d.name ? 'is-on' : ''}`}
+                    onClick={() => setSelectedDocName(d.name)}
                   >
-                    <div className="flex items-center justify-between gap-2">
+                    {d.name}
+                  </button>
+                ))}
+              </div>
+              {activeDoc ? (
+                <div className="wr-block">
+                  <div className="wr-docmeta">
+                    <span>#{activeDoc.roomName}</span>
+                    <span>by {activeDoc.created_by_name}</span>
+                  </div>
+                  {activeDoc.description && (
+                    <p style={{ margin: '0 0 10px', fontSize: 13, color: 'var(--soft)' }}>{activeDoc.description}</p>
+                  )}
+                  <pre className="vl-code wr-code wr-code--wrap">{activeDoc.content}</pre>
+                </div>
+              ) : (
+                <div className="wr-empty">No room documents yet.</div>
+              )}
+            </div>
+          )}
+
+          {rightTab === 'wire' && (
+            <div className="wr-pane">
+              <p>
+                Live Switch Agent Protocol frames: <span className="wr-code-inline">connection_state</span>,{' '}
+                <span className="wr-code-inline">ping/pong</span> cursors, <span className="wr-code-inline">message</span>, and
+                ops sent with <span className="wr-code-inline">X-Switch-Connection-Id</span>.
+              </p>
+              <div className="wr-rows">
+                {snap.wireTraces.map((t) => (
+                  <div key={t.id} className="wr-wire">
+                    <div className="wr-wire-top">
                       <span
-                        className={`px-1.5 py-0.5 rounded text-[10px] ${
-                          t.direction === 'http_op'
-                            ? 'bg-amber-500/15 text-amber-300'
-                            : t.direction === 'outbound'
-                              ? 'bg-indigo-500/15 text-indigo-300'
-                              : 'bg-emerald-500/15 text-emerald-300'
+                        className={`wr-tag ${
+                          t.direction === 'http_op' ? 'wr-tag--warn' : t.direction === 'outbound' ? 'wr-tag--ink' : 'wr-tag--brand'
                         }`}
                       >
                         {t.frameType}
                       </span>
-                      <span className="text-slate-400">{t.agentName}</span>
+                      <span className="wr-wire-agent">{t.agentName}</span>
                     </div>
-                    <div className="text-slate-300 mt-1 break-words">{t.summary}</div>
+                    <div className="wr-wire-sum">{t.summary}</div>
                   </div>
                 ))}
               </div>
-            )}
+            </div>
+          )}
 
-            {rightTab === 'patch' && (
-              <div className="space-y-4 text-xs">
-                {/* Governance: policy read live from the release-safety-policy room document */}
-                <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-semibold text-slate-200 flex items-center gap-1.5">
-                      <Scale className="w-3.5 h-3.5 text-amber-400" />
-                      Release Policy · from <code className="font-mono text-amber-300">release-safety-policy</code> room doc
-                    </h3>
-                    <span className="text-[10px] font-mono text-slate-500">humans edit via chat</span>
+          {rightTab === 'patch' && (
+            <div className="wr-pane">
+              {/* Release policy, read live from the release-safety-policy room document */}
+              <div className="wr-card">
+                <div className="wr-card-h">
+                  <h3 className="wr-card-title">
+                    <Scale className="wr-ic" />
+                    Release policy
+                  </h3>
+                  <span className="wr-label">room doc · humans edit via chat</span>
+                </div>
+                <div className="wr-kv">
+                  <div>
+                    <small>max changed lines</small>
+                    <b>{policy.maxChangedLines}</b>
                   </div>
-                  <div className="grid grid-cols-2 gap-1.5 font-mono text-[11px]">
-                    <div className="p-1.5 rounded bg-slate-950 border border-slate-800 text-slate-300">
-                      max_changed_lines: <span className="text-white">{snap.releasePolicy.maxChangedLines}</span>
-                    </div>
-                    <div className="p-1.5 rounded bg-slate-950 border border-slate-800 text-slate-300">
-                      require_green_matrix: <span className="text-white">{String(snap.releasePolicy.requireGreenMatrix)}</span>
-                    </div>
-                    <div className="p-1.5 rounded bg-slate-950 border border-slate-800 text-slate-300 col-span-2 truncate">
-                      allowed_approvers: <span className="text-white">{snap.releasePolicy.allowedApprovers.join(', ')}</span>
-                    </div>
-                    <div className="p-1.5 rounded bg-slate-950 border border-slate-800 text-slate-300 col-span-2 truncate">
-                      forbidden_paths: <span className="text-white">{snap.releasePolicy.forbiddenPaths.join(', ') || 'none'}</span>
-                    </div>
+                  <div>
+                    <small>green matrix</small>
+                    <b>{policy.requireGreenMatrix ? 'required' : 'off'}</b>
                   </div>
-                  {snap.policyAudit.length > 0 && (
-                    <div className="space-y-1">
-                      {snap.policyAudit.slice(-4).reverse().map((a) => (
-                        <div
-                          key={a.at}
-                          className={`text-[11px] font-mono px-2 py-1 rounded border ${
-                            a.accepted
-                              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-200'
-                              : 'bg-rose-500/10 border-rose-500/30 text-rose-200'
-                          }`}
-                        >
-                          {a.senderName}: {a.summary}
+                  <div>
+                    <small>canary probes</small>
+                    <b>{policy.minCanaryProbes}</b>
+                  </div>
+                  <div>
+                    <small>approvers</small>
+                    <b title={policy.allowedApprovers.join(', ')}>{policy.allowedApprovers.join(', ')}</b>
+                  </div>
+                  <div className="is-wide">
+                    <small>forbidden paths</small>
+                    <b title={policy.forbiddenPaths.join(', ')}>{policy.forbiddenPaths.join(', ') || 'none'}</b>
+                  </div>
+                </div>
+                {snap.policyAudit.length > 0 && (
+                  <div className="wr-rows wr-audit">
+                    {snap.policyAudit
+                      .slice(-4)
+                      .reverse()
+                      .map((a) => (
+                        <div key={a.at} className="wr-row wr-row--log">
+                          <span className={`wr-sq ${a.accepted ? '' : 'wr-sq--alert'}`} />
+                          <span>
+                            {a.senderName}: {a.summary}
+                          </span>
                         </div>
                       ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* External coder intake: shown when the incident is routed to a Switch Console coding agent */}
-                {latestInc && latestInc.patchMode === 'external' && !latestInc.canaryReport && !latestInc.patchVerification?.allPassed && (
-                  <div className="p-3 rounded-xl bg-indigo-950/30 border border-indigo-500/35 space-y-2">
-                    <h3 className="font-semibold text-indigo-200 flex items-center gap-1.5">
-                      <Upload className="w-3.5 h-3.5" />
-                      External patch intake · {latestInc.incidentId} · author @{snap.externalCoderHandle}
-                    </h3>
-                    <p className="text-[11px] text-indigo-200/80">
-                      Claude Code (or any coding agent in <code className="font-mono">#vigil-hotfix</code>) hands its unified diff to{' '}
-                      <code className="font-mono">@vigil-patcher</code> in a <code className="font-mono">```diff</code> fence or via{' '}
-                      <code className="font-mono">POST /api/incidents/{latestInc.incidentId}/stage-patch</code>. Vigil verifies it; a diff without the fix is rejected.
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <input
-                        value={externalAuthor}
-                        onChange={(e) => setExternalAuthor(e.target.value)}
-                        className="w-36 bg-slate-950 border border-slate-700 rounded px-2 py-1 text-[11px] font-mono text-slate-200"
-                        placeholder="author handle"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => loadReferenceFix(latestInc.incidentId)}
-                        className="text-[11px] font-mono px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
-                      >
-                        Load reference fix
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setExternalDiff('--- a/src/services/cartPricing.ts\n+++ b/src/services/cartPricing.ts\n@@ -1,1 +1,1 @@\n-// TODO\n+// cosmetic comment only, does not fix the fault')}
-                        className="text-[11px] font-mono px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-rose-300"
-                        title="A diff that doesn't carry the fix: the verifier must reject it"
-                      >
-                        Load bad diff
-                      </button>
-                    </div>
-                    <textarea
-                      value={externalDiff}
-                      onChange={(e) => setExternalDiff(e.target.value)}
-                      rows={7}
-                      spellCheck={false}
-                      placeholder={'--- a/src/services/cartPricing.ts\n+++ b/src/services/cartPricing.ts\n@@ ... @@\n+  JPY: { minorScale: 1 },'}
-                      className="w-full bg-slate-950 border border-slate-700 focus:border-indigo-400 rounded-lg p-2 font-mono text-[11px] text-emerald-200 outline-none"
-                    />
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-[11px] font-mono text-slate-400 truncate">{stageResult}</span>
-                      <button
-                        type="button"
-                        disabled={busyAction !== null || !externalDiff.trim()}
-                        onClick={() => submitExternalPatch(latestInc.incidentId)}
-                        className="px-3 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 transition disabled:opacity-50"
-                      >
-                        <Upload className="w-3.5 h-3.5" />
-                        Submit to @vigil-patcher
-                      </button>
-                    </div>
                   </div>
                 )}
+              </div>
 
-                {!latestInc ? (
-                  <div className="p-6 rounded-xl border border-dashed border-slate-800 text-center text-slate-400">
-                    Trigger any Chaos Release scenario above to inspect live bug reproduction, surgical diff, test matrix, and post-deploy synthetic canary probes.
+              {/* External coder intake */}
+              {latestInc && latestInc.patchMode === 'external' && !latestInc.canaryReport && !latestInc.patchVerification?.allPassed && (
+                <div className="wr-card wr-card--ext">
+                  <div className="wr-card-h">
+                    <h3 className="wr-card-title">
+                      <Upload className="wr-ic" />
+                      External patch intake
+                    </h3>
+                    <span className="wr-tag wr-tag--violet">
+                      {latestInc.incidentId} · @{snap.externalCoderHandle}
+                    </span>
                   </div>
-                ) : (
-                  <>
-                    <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span className="font-mono font-semibold text-white">
-                          {latestInc.incidentId} · {latestInc.stage.toUpperCase()}
-                        </span>
-                        <span className="font-mono text-[11px] text-amber-300">
-                          commit {latestInc.alert.suspectedCommit.sha}
-                        </span>
-                      </div>
-                      <p className="text-slate-300">{latestInc.title}</p>
-                      <div className="flex flex-wrap gap-1.5 pt-1 text-[10px] font-mono">
-                        <span className={`px-1.5 py-0.5 rounded border ${latestInc.patchMode === 'external' ? 'bg-indigo-500/15 border-indigo-500/40 text-indigo-200' : 'bg-emerald-500/15 border-emerald-500/40 text-emerald-200'}`}>
-                          patcher: {latestInc.patchMode === 'external' ? `@${snap.externalCoderHandle} (verified by vigil-patcher)` : 'vigil-patcher'}
-                        </span>
-                        {latestInc.patchVerification && (
-                          <span className="px-1.5 py-0.5 rounded border bg-slate-950 border-slate-700 text-slate-300">
-                            author: {latestInc.patchVerification.author}
-                          </span>
-                        )}
-                        {latestInc.workroom && (
-                          <button
-                            type="button"
-                            onClick={() => setSelectedRoomId(latestInc.workroom!.roomId)}
-                            className={`px-1.5 py-0.5 rounded border flex items-center gap-1 ${latestInc.workroom.archived ? 'bg-slate-900 border-slate-700 text-slate-400' : 'bg-sky-500/15 border-sky-500/40 text-sky-200 hover:bg-sky-500/25'}`}
-                          >
-                            <Archive className="w-3 h-3" />
-                            #{latestInc.workroom.roomName} {latestInc.workroom.archived ? '(archived)' : '(open)'}
-                          </button>
-                        )}
-                      </div>
+                  <p>
+                    Claude Code, or any coding agent in #vigil-hotfix, hands its unified diff to{' '}
+                    <span className="wr-code-inline">@vigil-patcher</span> in a diff fence or with{' '}
+                    <span className="wr-code-inline">POST /api/incidents/{latestInc.incidentId}/stage-patch</span>. Vigil verifies
+                    it. A diff without the fix is rejected.
+                  </p>
+                  <div className="wr-intake-actions">
+                    <input
+                      className="wr-input wr-input--sm"
+                      value={externalAuthor}
+                      onChange={(e) => setExternalAuthor(e.target.value)}
+                      placeholder="author handle"
+                      aria-label="Author handle"
+                    />
+                    <button type="button" className="wr-chipbtn" style={{ height: 32 }} onClick={() => loadReferenceFix(latestInc.incidentId)}>
+                      Load reference fix
+                    </button>
+                    <button
+                      type="button"
+                      className="wr-chipbtn wr-chipbtn--alert"
+                      style={{ height: 32 }}
+                      onClick={() =>
+                        setExternalDiff(
+                          '--- a/src/services/cartPricing.ts\n+++ b/src/services/cartPricing.ts\n@@ -1,1 +1,1 @@\n-// TODO\n+// cosmetic comment only, does not fix the fault',
+                        )
+                      }
+                      title="A diff that does not carry the fix: the verifier must reject it"
+                    >
+                      Load bad diff
+                    </button>
+                  </div>
+                  <textarea
+                    className="wr-textarea"
+                    value={externalDiff}
+                    onChange={(e) => setExternalDiff(e.target.value)}
+                    rows={8}
+                    spellCheck={false}
+                    placeholder={'--- a/src/cartPricing.ts\n+++ b/src/cartPricing.ts\n@@ ... @@\n+  JPY: { minorScale: 1 },'}
+                  />
+                  <div className="wr-intake-foot">
+                    <span>{stageResult}</span>
+                    <button
+                      type="button"
+                      className="wr-btn wr-btn--violet"
+                      disabled={busy || !externalDiff.trim()}
+                      onClick={() => submitExternalPatch(latestInc.incidentId)}
+                    >
+                      <Upload className="wr-ic" />
+                      <span>Submit to @vigil-patcher</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {!latestInc ? (
+                <div className="wr-empty">
+                  Ship a chaos release from the bar above. This tab then shows the real reproduction, the candidate diff, the
+                  test matrix, the gate decisions and the canary probes.
+                </div>
+              ) : (
+                <>
+                  <div className="wr-card">
+                    <div className="wr-inc-top">
+                      <span className="wr-inc-id">{latestInc.incidentId}</span>
+                      <span className={`wr-tag ${stageTone(latestInc.stage)}`}>{latestInc.stage.replace(/_/g, ' ')}</span>
                     </div>
+                    <h3 className="wr-inc-title">{latestInc.title}</h3>
+                    <div className="wr-inc-meta">
+                      <span className="wr-tag">commit {latestInc.alert.suspectedCommit.sha}</span>
+                      <span className={`wr-tag ${latestInc.patchMode === 'external' ? 'wr-tag--violet' : 'wr-tag--brand'}`}>
+                        {latestInc.patchMode === 'external' ? `@${snap.externalCoderHandle} · verified by vigil-patcher` : 'vigil-patcher'}
+                      </span>
+                      {pv && <span className="wr-tag">author {pv.author}</span>}
+                      {latestInc.workroom && (
+                        <button
+                          type="button"
+                          className={`wr-tag ${latestInc.workroom.archived ? '' : 'wr-tag--violet'}`}
+                          onClick={() => setSelectedRoomId(latestInc.workroom!.roomId)}
+                        >
+                          <Archive className="wr-ic" />#{latestInc.workroom.roomName} · {latestInc.workroom.archived ? 'archived' : 'open'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
 
-                    {latestInc.patchVerification && (
-                      <>
-                        <div>
-                          <h3 className="font-semibold text-slate-300 mb-1.5">
-                            Candidate Diff ({latestInc.patchVerification.candidateVersion}
-                            {latestInc.patchVerification.candidateSha ? ` @ ${latestInc.patchVerification.candidateSha}` : ', discarded'})
-                          </h3>
-                          <pre className="p-3 rounded-lg bg-slate-950 border border-slate-800 font-mono text-[11px] text-emerald-300 overflow-x-auto">
-                            {latestInc.patchVerification.diffUnified}
-                          </pre>
+                  {pv && (
+                    <>
+                      <div className="wr-block">
+                        <div className="wr-h3">
+                          <span className="wr-label">
+                            <b>Candidate diff</b>
+                          </span>
+                          <span className="wr-label">
+                            {pv.candidateVersion}
+                            {pv.candidateSha ? ` @ ${pv.candidateSha}` : ' · discarded'}
+                          </span>
                         </div>
-
-                        <div>
-                          <h3 className="font-semibold text-slate-300 mb-1.5">
-                            Regression Matrix ({latestInc.patchVerification.testMatrix.filter((t) => t.passed).length}/
-                            {latestInc.patchVerification.testMatrix.length} green)
-                          </h3>
-                          <div className="space-y-1.5">
-                            {latestInc.patchVerification.testMatrix.map((vec) => (
-                              <div
-                                key={vec.name}
-                                className="p-2 rounded-lg bg-slate-900/70 border border-slate-800 flex items-start gap-2"
-                              >
-                                {vec.passed ? (
-                                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                                ) : (
-                                  <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
-                                )}
-                                <div>
-                                  <div className={`font-medium ${vec.passed ? 'text-slate-200' : 'text-rose-200'}`}>{vec.name}</div>
-                                  <div className="font-mono text-[11px] text-slate-400">
-                                    {vec.detail}
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </>
-                    )}
-
-                    {latestInc.patchVerification && (
-                      <div>
-                        <h3 className="font-semibold text-slate-300 mb-1.5">
-                          Real test run output (node --test, TAP)
-                        </h3>
-                        <pre className="p-3 rounded-lg bg-slate-950 border border-slate-800 font-mono text-[10px] text-slate-400 whitespace-pre-wrap max-h-48 overflow-y-auto">
-                          {latestInc.patchVerification.testRunOutput.trim().split('\n').slice(-20).join('\n')}
-                        </pre>
+                        <DiffBlock diff={pv.diffUnified} />
                       </div>
-                    )}
 
-                    {latestInc.gateDecisions.length > 0 && (
-                      <div>
-                        <h3 className="font-semibold text-slate-300 mb-1.5">
-                          Release Safety Gate Audit Log
-                        </h3>
-                        <div className="space-y-1.5">
-                          {latestInc.gateDecisions.map((gd, idx) => (
-                            <div
-                              key={idx}
-                              className={`p-2.5 rounded-lg border text-[11px] ${
-                                gd.allowed
-                                  ? 'bg-emerald-500/10 border-emerald-500/35 text-emerald-200'
-                                  : 'bg-rose-500/10 border-rose-500/35 text-rose-200'
-                              }`}
-                            >
-                              <div className="font-mono font-semibold">{gd.reasonCode}</div>
-                              <div className="mt-0.5">{gd.explanation}</div>
+                      <div className="wr-block">
+                        <div className="wr-h3">
+                          <span className="wr-label">
+                            <b>Regression matrix</b>
+                          </span>
+                          <span className={`wr-tag ${pv.allPassed ? 'wr-tag--brand' : 'wr-tag--alert'}`}>
+                            {pv.testMatrix.filter((t) => t.passed).length}/{pv.testMatrix.length} green
+                          </span>
+                        </div>
+                        <div className="wr-rows wr-matrix">
+                          {pv.testMatrix.map((vec) => (
+                            <div key={vec.name} className={`wr-row ${vec.passed ? '' : 'is-fail'}`}>
+                              <span className={`wr-sq ${vec.passed ? '' : 'wr-sq--alert'}`} />
+                              <div>
+                                <div className="wr-matrix-name">{vec.name}</div>
+                                <div className="wr-matrix-detail">{vec.detail}</div>
+                              </div>
                             </div>
                           ))}
                         </div>
                       </div>
-                    )}
 
-                    {latestInc.canaryReport && (
-                      <div>
-                        <h3 className="font-semibold text-emerald-300 mb-1.5 flex items-center gap-1.5">
-                          <Play className="w-3.5 h-3.5" />
-                          Post-Deploy Synthetic Canary ({latestInc.canaryReport.probesPassed}/
-                          {latestInc.canaryReport.probesRun} 200 OK)
-                        </h3>
-                        <div className="p-2.5 rounded-lg bg-slate-950 border border-emerald-500/30 font-mono text-[11px] text-slate-300 space-y-1">
-                          {latestInc.canaryReport.details.map((line, i) => (
-                            <div key={i}>✓ {line}</div>
-                          ))}
+                      <div className="wr-block">
+                        <div className="wr-h3">
+                          <span className="wr-label">
+                            <b>Real test run</b>
+                          </span>
+                          <span className="wr-label">node --test · TAP</span>
                         </div>
+                        <pre className="vl-code wr-code wr-code--wrap wr-code--short">
+                          {pv.testRunOutput.trim().split('\n').slice(-20).join('\n')}
+                        </pre>
                       </div>
-                    )}
-                  </>
-                )}
-              </div>
-            )}
-          </div>
+                    </>
+                  )}
+
+                  {latestInc.gateDecisions.length > 0 && (
+                    <div className="wr-block">
+                      <div className="wr-h3">
+                        <span className="wr-label">
+                          <b>Release gate decisions</b>
+                        </span>
+                        <span className="wr-label">deterministic</span>
+                      </div>
+                      <div className="wr-rows">
+                        {latestInc.gateDecisions.map((gd, idx) => (
+                          <div key={idx} className={`wr-decision ${gd.allowed ? '' : 'is-deny'}`}>
+                            <b>{gd.reasonCode}</b>
+                            <span>{gd.explanation}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {latestInc.canaryReport && (
+                    <div className="wr-block">
+                      <div className="wr-h3">
+                        <span className="wr-label">
+                          <b>Post-deploy canary</b>
+                        </span>
+                        <span className={`wr-tag ${latestInc.canaryReport.healthy ? 'wr-tag--brand' : 'wr-tag--alert'}`}>
+                          {latestInc.canaryReport.probesPassed}/{latestInc.canaryReport.probesRun} 200 OK
+                        </span>
+                      </div>
+                      <pre className="vl-code wr-code wr-code--wrap">
+                        {latestInc.canaryReport.details.map((line, i) => (
+                          <span key={i}>
+                            <span className="ok">✓ </span>
+                            {line}
+                            {'\n'}
+                          </span>
+                        ))}
+                      </pre>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
         </section>
       </main>
 
-      {/* Switch Group Template Modal */}
+      {/* ───────────── Switch template modal ───────────── */}
       {showTemplateModal && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-3xl w-full max-h-[85vh] flex flex-col shadow-2xl">
-            <div className="px-5 py-3.5 border-b border-slate-800 flex items-center justify-between">
+        <div className="wr-modal-bg" onClick={() => setShowTemplateModal(false)}>
+          <div className="wr-modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+            <div className="wr-modal-h">
               <div>
-                <h3 className="font-semibold text-sm text-white">
-                  templates/vigil-war-room.template.yaml
-                </h3>
-                <p className="text-xs text-slate-400">
-                  Import directly into Switch Console → Templates → Import template to provision all 3 linked rooms, roles, docs & agents in Mattermost, Discord, Telegram, or Slack.
+                <span className="wr-label">templates/vigil-war-room.template.yaml</span>
+                <h2>Switch group template</h2>
+                <p>
+                  Import into Switch Console under Templates to provision the three linked rooms, roles, documents and agents
+                  in Mattermost, Discord, Telegram or Slack.
                 </p>
               </div>
-              <div className="flex items-center gap-2">
+              <div>
                 <button
+                  type="button"
+                  className="wr-btn wr-btn--dark"
                   onClick={() => {
                     navigator.clipboard.writeText(templateYaml);
                     setCopiedYaml(true);
                     setTimeout(() => setCopiedYaml(false), 2000);
                   }}
-                  className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium flex items-center gap-1.5"
                 >
-                  <Copy className="w-3.5 h-3.5" />
-                  {copiedYaml ? 'Copied!' : 'Copy YAML'}
+                  <Copy className="wr-ic" />
+                  <span>{copiedYaml ? 'Copied' : 'Copy YAML'}</span>
                 </button>
-                <button
-                  onClick={() => setShowTemplateModal(false)}
-                  className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs"
-                >
-                  Close
+                <button type="button" className="wr-btn" onClick={() => setShowTemplateModal(false)}>
+                  <X className="wr-ic" />
+                  <span>Close</span>
                 </button>
               </div>
             </div>
-            <pre className="p-5 overflow-y-auto font-mono text-xs text-slate-200 whitespace-pre">
-              {templateYaml}
-            </pre>
+            <pre className="vl-code">{templateYaml}</pre>
           </div>
         </div>
       )}
     </div>
+  );
+}
+
+const FAULTS = [
+  { id: 'jpy_zero_decimal_500', n: '01', label: 'JPY Zero-Decimal 500', tone: 'alert' },
+  { id: 'promo_negative_ledger_500', n: '02', label: 'Stacked Promo Negative 500', tone: 'warn' },
+  { id: 'inventory_lock_leak_503', n: '03', label: 'Inventory Lock Leak 503', tone: 'violet' },
+] as const;
+
+function stageTone(stage: string): string {
+  if (stage === 'resolved_promoted') return 'wr-tag--brand';
+  if (stage === 'resolved_rolled_back') return '';
+  if (stage === 'awaiting_human_gate') return 'wr-tag--warn';
+  if (stage === 'reproducing_patching') return 'wr-tag--violet';
+  return 'wr-tag--alert';
+}
+
+/** Unified diff with added and removed lines coloured, on the landing page's dark code surface. */
+function DiffBlock({ diff }: { diff: string }) {
+  return (
+    <pre className="vl-code wr-code">
+      {diff.split('\n').map((line, i) => {
+        const cls =
+          line.startsWith('+++') || line.startsWith('---') || line.startsWith('diff ') || line.startsWith('index ')
+            ? 'c'
+            : line.startsWith('@@')
+              ? 'p'
+              : line.startsWith('+')
+                ? 'ok'
+                : line.startsWith('-')
+                  ? 'no'
+                  : undefined;
+        return (
+          <span key={i} className={cls}>
+            {line}
+            {'\n'}
+          </span>
+        );
+      })}
+    </pre>
   );
 }
