@@ -11,6 +11,12 @@ import {
   Flame,
   GitCommit,
   Home,
+  Archive,
+  HeartPulse,
+  Scale,
+  Skull,
+  Upload,
+  Wrench,
   Lock,
   Network,
   Play,
@@ -71,6 +77,8 @@ interface SwitchRoom {
   documents: RoomDocument[];
   links: RoomLink[];
   messages: RoomMessage[];
+  archived?: boolean;
+  ephemeral?: boolean;
 }
 
 interface SwitchAgentSummary {
@@ -112,7 +120,11 @@ interface IncidentRecord {
     touchedFiles: string[];
     testMatrix: Array<{ name: string; passed: boolean; detail: string }>;
     allPassed: boolean;
+    author: string;
+    source: 'vigil-patcher' | 'external-coder';
   } | null;
+  workroom: { roomId: string; roomName: string; archived: boolean } | null;
+  patchMode: 'auto' | 'external';
   gateDecisions: Array<{
     allowed: boolean;
     action: string | null;
@@ -169,6 +181,25 @@ interface ObservatorySnapshot {
     hotfixRoomId: string;
     releasesRoomId: string;
   };
+  patchMode: 'auto' | 'external';
+  externalCoderHandle: string;
+  releasePolicy: {
+    maxChangedLines: number;
+    forbiddenPaths: string[];
+    requireGreenMatrix: boolean;
+    allowedApprovers: string[];
+    minCanaryProbes: number;
+  };
+  policyAudit: Array<{ at: number; senderName: string; accepted: boolean; summary: string }>;
+  failovers: Array<{
+    at: number;
+    previousGeneration: number | null;
+    newGeneration: number | null;
+    resumedFromCursor: number;
+    leaseReclaimed: boolean;
+    previousConnectionEvicted: boolean;
+  }>;
+  retiredSentinels: Array<{ connectionId: string; generation: number | null; evicted: boolean; hung: boolean }>;
 }
 
 export function App({ onHome }: { onHome?: () => void } = {}) {
@@ -182,6 +213,9 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
   const [showTemplateModal, setShowTemplateModal] = useState<boolean>(false);
   const [templateYaml, setTemplateYaml] = useState<string>('');
   const [copiedYaml, setCopiedYaml] = useState<boolean>(false);
+  const [externalDiff, setExternalDiff] = useState<string>('');
+  const [externalAuthor, setExternalAuthor] = useState<string>('claude-code');
+  const [stageResult, setStageResult] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -292,6 +326,55 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
       const res = await fetch('/api/templates');
       const data = await res.json();
       setTemplateYaml(data.warRoomTemplate ?? '');
+    }
+  };
+
+  const setPatchMode = async (mode: 'auto' | 'external') => {
+    setBusyAction('patch-mode');
+    try {
+      await fetch('/api/patch-mode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode }),
+      });
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
+  const chaosCall = async (path: string) => {
+    setBusyAction(path);
+    try {
+      await fetch(path, { method: 'POST' });
+      if (snap?.roomIds.incidentsRoomId) setSelectedRoomId(snap.roomIds.incidentsRoomId);
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
+  const loadReferenceFix = async (incidentId: string) => {
+    const res = await fetch(`/api/incidents/${incidentId}/reference-fix`);
+    if (res.ok) {
+      const data = await res.json();
+      setExternalDiff(data.diffUnified ?? '');
+    }
+  };
+
+  const submitExternalPatch = async (incidentId: string) => {
+    if (!externalDiff.trim()) return;
+    setBusyAction('stage-patch');
+    setStageResult('');
+    try {
+      const res = await fetch(`/api/incidents/${incidentId}/stage-patch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ diffUnified: externalDiff, author: externalAuthor || 'claude-code' }),
+      });
+      const data = await res.json();
+      setStageResult(data.next ?? data.error ?? (res.ok ? 'Accepted' : 'Rejected'));
+      if (snap?.roomIds.hotfixRoomId) setSelectedRoomId(snap.roomIds.hotfixRoomId);
+    } finally {
+      setBusyAction(null);
     }
   };
 
@@ -408,6 +491,54 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
             <Lock className="w-3.5 h-3.5 text-purple-400" />
             3. Inventory Lock Leak 503
           </button>
+
+          <span className="hidden md:inline-block w-px h-5 bg-slate-700 mx-1" />
+
+          <div
+            className="flex items-center rounded-md border border-slate-700 bg-slate-900 text-[11px] font-mono overflow-hidden"
+            title="Who writes the fix: Vigil's own patcher, or a coding agent you already use (Claude Code / Codex) bound through Switch Console. Vigil verifies either way."
+          >
+            <span className="px-2 py-1.5 text-slate-400 flex items-center gap-1">
+              <Wrench className="w-3 h-3" /> patcher:
+            </span>
+            <button
+              disabled={busyAction !== null}
+              onClick={() => setPatchMode('auto')}
+              className={`px-2 py-1.5 transition ${
+                snap.patchMode === 'auto' ? 'bg-emerald-600 text-white' : 'text-slate-300 hover:bg-slate-800'
+              }`}
+            >
+              vigil-patcher
+            </button>
+            <button
+              disabled={busyAction !== null}
+              onClick={() => setPatchMode('external')}
+              className={`px-2 py-1.5 transition ${
+                snap.patchMode === 'external' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:bg-slate-800'
+              }`}
+            >
+              @{snap.externalCoderHandle} (Switch Console)
+            </button>
+          </div>
+
+          <button
+            disabled={busyAction !== null}
+            onClick={() => chaosCall('/api/chaos/crash-sentinel')}
+            className="px-2.5 py-1.5 rounded-md bg-slate-900 hover:bg-slate-800 border border-rose-500/40 text-rose-300 text-xs font-mono flex items-center gap-1.5 transition disabled:opacity-50"
+            title="Wedge the live incident commander: socket stays open, pings go unanswered"
+          >
+            <Skull className="w-3.5 h-3.5" />
+            Crash Sentinel
+          </button>
+          <button
+            disabled={busyAction !== null}
+            onClick={() => chaosCall('/api/chaos/failover-sentinel')}
+            className="px-2.5 py-1.5 rounded-md bg-slate-900 hover:bg-slate-800 border border-emerald-500/40 text-emerald-300 text-xs font-mono flex items-center gap-1.5 transition disabled:opacity-50"
+            title="Standby sentinel reopens the same connection_id from the last cursor; old socket is evicted with taken_over and the incident-commander lease is re-asserted"
+          >
+            <HeartPulse className="w-3.5 h-3.5" />
+            Failover Sentinel
+          </button>
         </div>
       </section>
 
@@ -502,15 +633,29 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
                       className={`w-full text-left p-3 rounded-xl border transition ${
                         isSelected
                           ? 'bg-emerald-500/10 border-emerald-500/50 shadow-sm'
-                          : 'bg-slate-900/70 hover:bg-slate-800/70 border-slate-800'
+                          : room.archived
+                            ? 'bg-slate-950/50 hover:bg-slate-900/60 border-slate-800/60 opacity-70'
+                            : 'bg-slate-900/70 hover:bg-slate-800/70 border-slate-800'
                       }`}
                     >
-                      <div className="flex items-center justify-between">
-                        <span className="font-mono text-sm font-semibold text-white">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className={`font-mono text-sm font-semibold ${room.archived ? 'text-slate-500 line-through' : 'text-white'}`}>
                           #{room.name}
                         </span>
-                        <span className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">
-                          seq:{room.seq}
+                        <span className="flex items-center gap-1">
+                          {room.ephemeral && (
+                            <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border flex items-center gap-1 ${
+                              room.archived
+                                ? 'bg-slate-900 border-slate-700 text-slate-500'
+                                : 'bg-sky-500/15 border-sky-500/40 text-sky-200'
+                            }`}>
+                              <Archive className="w-3 h-3" />
+                              {room.archived ? 'archived' : 'ephemeral'}
+                            </span>
+                          )}
+                          <span className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">
+                            seq:{room.seq}
+                          </span>
                         </span>
                       </div>
                       <p className="text-xs text-slate-400 mt-1 line-clamp-2">{room.description}</p>
@@ -538,7 +683,7 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
                       )}
                     </button>
 
-                    {idx < snap.switchState.rooms.length - 1 && (
+                    {!room.ephemeral && idx < 2 && (
                       <div className="flex items-center gap-1.5 pl-4 text-[11px] font-mono text-slate-500">
                         <ArrowRight className="w-3 h-3 text-emerald-500/70" />
                         <span className="truncate">
@@ -582,6 +727,29 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
               ))}
             </div>
           </div>
+
+          {(snap.failovers.length > 0 || snap.retiredSentinels.length > 0) && (
+            <div>
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 mb-2.5">
+                <HeartPulse className="w-3.5 h-3.5 text-rose-400" />
+                Commander Failover Log
+              </h2>
+              <div className="space-y-2 text-[11px] font-mono">
+                {snap.retiredSentinels.map((r) => (
+                  <div key={r.connectionId + String(r.generation)} className="p-2.5 rounded-lg bg-slate-900/70 border border-rose-500/30 text-rose-200">
+                    gen {r.generation ?? '-'} · conn {r.connectionId.slice(0, 8)}… · {r.hung ? 'hung' : 'live'} ·{' '}
+                    {r.evicted ? 'evicted: taken_over' : 'awaiting eviction'}
+                  </div>
+                ))}
+                {snap.failovers.map((f) => (
+                  <div key={f.at} className="p-2.5 rounded-lg bg-slate-900/70 border border-emerald-500/30 text-emerald-200">
+                    standby gen {f.newGeneration ?? '-'} resumed from cursor {f.resumedFromCursor} · lease{' '}
+                    {f.leaseReclaimed ? 're-asserted' : 'not needed'}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </aside>
 
         {/* CENTER COLUMN: Live Switch Room Append-Only Message Log & Human Chat Bar */}
@@ -663,6 +831,27 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
                     className="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
                   >
                     @vigil-patcher show diff
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedRoomId(snap.roomIds.releasesRoomId);
+                      setChatInput('@vigil-release-gate policy');
+                    }}
+                    className="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
+                  >
+                    @vigil-release-gate policy
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedRoomId(snap.roomIds.releasesRoomId);
+                      setChatInput('@vigil-release-gate set max diff 1');
+                    }}
+                    className="text-[11px] font-mono px-2 py-0.5 rounded bg-amber-500/15 hover:bg-amber-500/25 text-amber-200 border border-amber-500/30"
+                    title="Tighten the room policy from chat so the staged patch gets rejected on the next approval"
+                  >
+                    set max diff 1
                   </button>
                   {activeInc && (
                     <button
@@ -813,6 +1002,105 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
 
             {rightTab === 'patch' && (
               <div className="space-y-4 text-xs">
+                {/* Governance: policy read live from the release-safety-policy room document */}
+                <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold text-slate-200 flex items-center gap-1.5">
+                      <Scale className="w-3.5 h-3.5 text-amber-400" />
+                      Release Policy · from <code className="font-mono text-amber-300">release-safety-policy</code> room doc
+                    </h3>
+                    <span className="text-[10px] font-mono text-slate-500">humans edit via chat</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5 font-mono text-[11px]">
+                    <div className="p-1.5 rounded bg-slate-950 border border-slate-800 text-slate-300">
+                      max_changed_lines: <span className="text-white">{snap.releasePolicy.maxChangedLines}</span>
+                    </div>
+                    <div className="p-1.5 rounded bg-slate-950 border border-slate-800 text-slate-300">
+                      require_green_matrix: <span className="text-white">{String(snap.releasePolicy.requireGreenMatrix)}</span>
+                    </div>
+                    <div className="p-1.5 rounded bg-slate-950 border border-slate-800 text-slate-300 col-span-2 truncate">
+                      allowed_approvers: <span className="text-white">{snap.releasePolicy.allowedApprovers.join(', ')}</span>
+                    </div>
+                    <div className="p-1.5 rounded bg-slate-950 border border-slate-800 text-slate-300 col-span-2 truncate">
+                      forbidden_paths: <span className="text-white">{snap.releasePolicy.forbiddenPaths.join(', ') || 'none'}</span>
+                    </div>
+                  </div>
+                  {snap.policyAudit.length > 0 && (
+                    <div className="space-y-1">
+                      {snap.policyAudit.slice(-4).reverse().map((a) => (
+                        <div
+                          key={a.at}
+                          className={`text-[11px] font-mono px-2 py-1 rounded border ${
+                            a.accepted
+                              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-200'
+                              : 'bg-rose-500/10 border-rose-500/30 text-rose-200'
+                          }`}
+                        >
+                          {a.senderName}: {a.summary}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* External coder intake: shown when the incident is routed to a Switch Console coding agent */}
+                {latestInc && latestInc.patchMode === 'external' && !latestInc.canaryReport && !latestInc.patchVerification?.allPassed && (
+                  <div className="p-3 rounded-xl bg-indigo-950/30 border border-indigo-500/35 space-y-2">
+                    <h3 className="font-semibold text-indigo-200 flex items-center gap-1.5">
+                      <Upload className="w-3.5 h-3.5" />
+                      External patch intake · {latestInc.incidentId} · author @{snap.externalCoderHandle}
+                    </h3>
+                    <p className="text-[11px] text-indigo-200/80">
+                      Claude Code (or any coding agent in <code className="font-mono">#vigil-hotfix</code>) hands its unified diff to{' '}
+                      <code className="font-mono">@vigil-patcher</code> in a <code className="font-mono">```diff</code> fence or via{' '}
+                      <code className="font-mono">POST /api/incidents/{latestInc.incidentId}/stage-patch</code>. Vigil verifies it; a diff without the fix is rejected.
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <input
+                        value={externalAuthor}
+                        onChange={(e) => setExternalAuthor(e.target.value)}
+                        className="w-36 bg-slate-950 border border-slate-700 rounded px-2 py-1 text-[11px] font-mono text-slate-200"
+                        placeholder="author handle"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => loadReferenceFix(latestInc.incidentId)}
+                        className="text-[11px] font-mono px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
+                      >
+                        Load reference fix
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setExternalDiff('--- a/src/services/cartPricing.ts\n+++ b/src/services/cartPricing.ts\n@@ -1,1 +1,1 @@\n-// TODO\n+// cosmetic comment only, does not fix the fault')}
+                        className="text-[11px] font-mono px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-rose-300"
+                        title="A diff that doesn't carry the fix: the verifier must reject it"
+                      >
+                        Load bad diff
+                      </button>
+                    </div>
+                    <textarea
+                      value={externalDiff}
+                      onChange={(e) => setExternalDiff(e.target.value)}
+                      rows={7}
+                      spellCheck={false}
+                      placeholder={'--- a/src/services/cartPricing.ts\n+++ b/src/services/cartPricing.ts\n@@ ... @@\n+  JPY: { minorScale: 1 },'}
+                      className="w-full bg-slate-950 border border-slate-700 focus:border-indigo-400 rounded-lg p-2 font-mono text-[11px] text-emerald-200 outline-none"
+                    />
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-mono text-slate-400 truncate">{stageResult}</span>
+                      <button
+                        type="button"
+                        disabled={busyAction !== null || !externalDiff.trim()}
+                        onClick={() => submitExternalPatch(latestInc.incidentId)}
+                        className="px-3 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 transition disabled:opacity-50"
+                      >
+                        <Upload className="w-3.5 h-3.5" />
+                        Submit to @vigil-patcher
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {!latestInc ? (
                   <div className="p-6 rounded-xl border border-dashed border-slate-800 text-center text-slate-400">
                     Trigger any Chaos Release scenario above to inspect live bug reproduction, surgical diff, test matrix, and post-deploy synthetic canary probes.
@@ -829,6 +1117,26 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
                         </span>
                       </div>
                       <p className="text-slate-300">{latestInc.title}</p>
+                      <div className="flex flex-wrap gap-1.5 pt-1 text-[10px] font-mono">
+                        <span className={`px-1.5 py-0.5 rounded border ${latestInc.patchMode === 'external' ? 'bg-indigo-500/15 border-indigo-500/40 text-indigo-200' : 'bg-emerald-500/15 border-emerald-500/40 text-emerald-200'}`}>
+                          patcher: {latestInc.patchMode === 'external' ? `@${snap.externalCoderHandle} (verified by vigil-patcher)` : 'vigil-patcher'}
+                        </span>
+                        {latestInc.patchVerification && (
+                          <span className="px-1.5 py-0.5 rounded border bg-slate-950 border-slate-700 text-slate-300">
+                            author: {latestInc.patchVerification.author}
+                          </span>
+                        )}
+                        {latestInc.workroom && (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedRoomId(latestInc.workroom!.roomId)}
+                            className={`px-1.5 py-0.5 rounded border flex items-center gap-1 ${latestInc.workroom.archived ? 'bg-slate-900 border-slate-700 text-slate-400' : 'bg-sky-500/15 border-sky-500/40 text-sky-200 hover:bg-sky-500/25'}`}
+                          >
+                            <Archive className="w-3 h-3" />
+                            #{latestInc.workroom.roomName} {latestInc.workroom.archived ? '(archived)' : '(open)'}
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     {latestInc.patchVerification && (
@@ -844,7 +1152,8 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
 
                         <div>
                           <h3 className="font-semibold text-slate-300 mb-1.5">
-                            5-Vector Regression Matrix
+                            Regression Matrix ({latestInc.patchVerification.testMatrix.filter((t) => t.passed).length}/
+                            {latestInc.patchVerification.testMatrix.length} green)
                           </h3>
                           <div className="space-y-1.5">
                             {latestInc.patchVerification.testMatrix.map((vec) => (
@@ -852,9 +1161,13 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
                                 key={vec.name}
                                 className="p-2 rounded-lg bg-slate-900/70 border border-slate-800 flex items-start gap-2"
                               >
-                                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                                {vec.passed ? (
+                                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                                ) : (
+                                  <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                                )}
                                 <div>
-                                  <div className="font-medium text-slate-200">{vec.name}</div>
+                                  <div className={`font-medium ${vec.passed ? 'text-slate-200' : 'text-rose-200'}`}>{vec.name}</div>
                                   <div className="font-mono text-[11px] text-slate-400">
                                     {vec.detail}
                                   </div>
