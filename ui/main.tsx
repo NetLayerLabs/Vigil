@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { App } from './App';
 import { Landing } from './Landing';
 import './index.css';
+import './theme.css';
 
 export const APP_PATH = '/app';
 
