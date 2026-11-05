@@ -190,6 +190,15 @@ rooms:
           - **Invariant 2 (Incident Binding):** Approval message must cite the active `INC-XXXX` identifier.
           - **Invariant 3 (Verified Artifact):** `promote` requires green reproduction + regression suite; `rollback` to `v2.13.2` is always available.
           - **Invariant 4 (Synthetic Canary):** 5 post-deploy synthetic checkout probes must return `200 OK` before closing the incident.
+          - **Invariant 5 (Blast Radius):** Candidate diffs are capped and may not touch protected paths.
+
+          ## Enforced Parameters
+          Edited from chat by verified humans only (e.g. `@{team}-release-gate set max diff 60`). Re-read by the gate on every evaluation.
+          - max_changed_lines: 40
+          - forbidden_paths: .env, secret, auth-keys, migrations/drop
+          - require_green_matrix: true
+          - allowed_approvers: any-human
+          - min_canary_probes: 5
     instructions: |
       Production release gate room. `@{team}-release-gate` summarizes staged hotfixes here and waits for `{$creator}` (or any authorized human teammate) to reply `approve <INC-ID> promote` or `approve <INC-ID> rollback`.
     kickoff: |
