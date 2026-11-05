@@ -39,6 +39,16 @@ flowchart LR
   R3 -->|"5/5 Synthetic Canary Probes (200 OK)"| API
 ```
 
+### Nothing Is Mocked
+| Layer | What actually runs |
+|---|---|
+| **Target service** | [`services/checkout-api`](./services/checkout-api) is a real Node/TypeScript HTTP service with its own source, `node:test` suite and release patches. Vigil copies it into a **git-backed working copy** (`.vigil-state/checkout-api-live-4020`, tag `v2.13.2`) and runs it as a **child process** on `:4020`. |
+| **Regressions** | *Chaos* = `git apply` a real release patch, commit it with the offending author/message, bump `VERSION` to `v2.14.0`, **restart the process**. The 500/503s are real exceptions from the new code. |
+| **Telemetry** | A built-in synthetic traffic generator sends real mixed-currency checkouts; the service measures error rate and p99 over a 60s window and exposes `/metrics`. On its first 5xx per version it POSTs a **real alert webhook** that opens the incident. |
+| **Patching** | Auto mode: `vigil-patcher` does a real `git revert` of the regression commit. External mode: your coding agent edits the working copy or posts a diff that is applied with `git apply`. Either way the candidate is **committed, tested with the service's real test suite, booted on a staging port, and replayed with the production payload**. Red candidates are discarded with `git reset --hard`. |
+| **Release** | Promote = restart the process from the verified candidate commit. Rollback = `git reset --hard v2.13.2` + restart. Canary = 5 real HTTP probes. The Observatory shows the live `git log` and the service `pid` changing on every deploy. |
+| **Seeded** | Only the three regression patches, and the embedded spec-exact Switch protocol server used in Mode A (Mode B connects to a real Switch Console server). |
+
 ### What Makes Vigil Different
 | | Feature | Switch primitive doing the work |
 |---|---|---|
@@ -155,7 +165,9 @@ Vigil/
 │   ├── gate/
 │   │   └── releaseSafetyGate.ts            # Zero-LLM deterministic human sign-off safety gate
 │   ├── services/
-│   │   └── checkoutSandbox.ts              # Live checkout-api (:4020) + 3 v2.14.0 chaos bugs
+│   │   └── checkoutTarget.ts               # Git-backed working copy + child process + real verify/deploy
+├── services/
+│   └── checkout-api/                       # The real target service: src/, test/ (node:test), releases/*.patch
 │   ├── mock-switch/
 │   │   └── switchServerHarness.ts          # Spec-exact Switch bridge for instant CI & local runs
 │   └── index.ts                            # Dual-mode runtime & Observatory server (:4010)
