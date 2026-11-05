@@ -10,7 +10,33 @@ import {
   IncidentAlertWebhook,
   PatchVerificationResult,
 } from '../services/checkoutSandbox.js';
-import { ReleaseGateDecision, ReleaseSafetyGate } from '../gate/releaseSafetyGate.js';
+import {
+  DEFAULT_RELEASE_POLICY,
+  ReleaseGateDecision,
+  ReleasePolicy,
+  ReleaseSafetyGate,
+} from '../gate/releaseSafetyGate.js';
+import YAML from 'yaml';
+
+export type PatchMode = 'auto' | 'external';
+
+export interface SentinelFailoverRecord {
+  at: number;
+  trigger: 'chaos_hang';
+  previousGeneration: number | null;
+  newGeneration: number | null;
+  resumedFromCursor: number;
+  leaseReclaimed: boolean;
+  previousConnectionEvicted: boolean;
+}
+
+export interface PolicyAuditEntry {
+  at: number;
+  senderName: string;
+  senderParticipantId: string;
+  accepted: boolean;
+  summary: string;
+}
 
 export type IncidentLifecycleStage =
   | 'detecting'
@@ -32,6 +58,10 @@ export interface IncidentLedgerRecord {
   finalVersion: string | null;
   openedAt: number;
   resolvedAt: number | null;
+  /** Ephemeral per-incident red/blue workroom created from `vigil-hotfix-workroom.template.yaml`. */
+  workroom: { roomId: string; roomName: string; archived: boolean } | null;
+  /** Which patcher the incident was routed to. */
+  patchMode: PatchMode;
 }
 
 export interface VigilMeshOptions {
@@ -41,6 +71,8 @@ export interface VigilMeshOptions {
   bridgeName?: string;
   creatorUsername?: string;
   externalCoderHandle?: string;
+  /** `auto`: Vigil's patcher writes the fix. `external`: a coding agent bound via Switch Console (e.g. Claude Code) does; Vigil verifies. */
+  patchMode?: PatchMode;
   checkoutService: CheckoutMicroservice;
   preRegisteredCreds?: {
     sentinel?: { id: string; api_key: string };
@@ -79,9 +111,52 @@ export class VigilMeshCoordinator {
   private knownAgentParticipantIds = new Set<string>();
   private knownAgentNames = new Set<string>();
 
+  private patchMode: PatchMode;
+  private releasePolicy: ReleasePolicy = DEFAULT_RELEASE_POLICY;
+  private readonly policyAudit: PolicyAuditEntry[] = [];
+  private readonly failovers: SentinelFailoverRecord[] = [];
+  private sentinelCreds: { id: string; api_key: string } | null = null;
+  private recordTrace: (trace: ProtocolWireTrace) => void = () => {};
+  private retiredSentinels: SwitchAgentClient[] = [];
+
   constructor(opts: VigilMeshOptions) {
     this.opts = opts;
     this.teamPrefix = opts.teamPrefix ?? 'vigil';
+    this.patchMode = opts.patchMode ?? (opts.externalCoderHandle ? 'external' : 'auto');
+  }
+
+  public getPatchMode(): PatchMode {
+    return this.patchMode;
+  }
+
+  public setPatchMode(mode: PatchMode): void {
+    this.patchMode = mode;
+    this.opts.onEventUpdate?.();
+  }
+
+  public getExternalCoderHandle(): string {
+    return this.opts.externalCoderHandle ?? 'claude-code';
+  }
+
+  public getReleasePolicy(): ReleasePolicy {
+    return this.releasePolicy;
+  }
+
+  public getPolicyAudit(): PolicyAuditEntry[] {
+    return [...this.policyAudit];
+  }
+
+  public getFailovers(): SentinelFailoverRecord[] {
+    return [...this.failovers];
+  }
+
+  public getRetiredSentinels(): Array<{ connectionId: string; generation: number | null; evicted: boolean; hung: boolean }> {
+    return this.retiredSentinels.map((c) => ({
+      connectionId: c.connectionId,
+      generation: c.getGeneration() ?? null,
+      evicted: c.isStoppedPermanently(),
+      hung: c.isHung(),
+    }));
   }
 
   public getWireTraces(): ProtocolWireTrace[] {
@@ -157,6 +232,8 @@ export class VigilMeshCoordinator {
         },
       }));
 
+    this.sentinelCreds = sentinelCreds;
+
     this.knownAgentNames = new Set([
       sentinelName.toLowerCase(),
       patcherName.toLowerCase(),
@@ -203,6 +280,7 @@ export class VigilMeshCoordinator {
       }
       this.opts.onEventUpdate?.();
     };
+    this.recordTrace = recordTrace;
 
     // 3. Instantiate independent WebSocket Agent Protocol clients
     this.sentinelClient = new SwitchAgentClient({
@@ -241,6 +319,14 @@ export class VigilMeshCoordinator {
       this.patcherClient.discoverOperations(),
       this.releaseGateClient.discoverOperations(),
     ]);
+
+    // A newly registered Switch agent answers only its owner. The mesh needs agent-to-agent handoffs
+    // and approvals from any human teammate, so widen addressing (needs no connection).
+    await Promise.all(
+      [this.sentinelClient, this.patcherClient, this.releaseGateClient].map((c) =>
+        c.updateAddressing('anyone').catch(() => undefined),
+      ),
+    );
 
     // Resolve room IDs from Switch Server
     const rooms = await this.sentinelClient.listRooms();
@@ -286,6 +372,7 @@ export class VigilMeshCoordinator {
 
   public async shutdown(): Promise<void> {
     await Promise.all([
+      ...this.retiredSentinels.map((c) => c.disconnect().catch(() => undefined)),
       this.sentinelClient?.disconnect(),
       this.patcherClient?.disconnect(),
       this.releaseGateClient?.disconnect(),
@@ -311,6 +398,8 @@ export class VigilMeshCoordinator {
       finalVersion: null,
       openedAt: Date.now(),
       resolvedAt: null,
+      workroom: null,
+      patchMode: this.patchMode,
     };
     this.incidents.set(alert.incidentId, record);
     this.activeIncidentId = alert.incidentId;
@@ -361,21 +450,103 @@ export class VigilMeshCoordinator {
     this.opts.onEventUpdate?.();
 
     const patcherHandle = `${this.teamPrefix}-patcher`;
-    const extraCoderMention = this.opts.externalCoderHandle
-      ? ` @${this.opts.externalCoderHandle}`
-      : '';
+    const coder = this.getExternalCoderHandle();
+    const external = record.patchMode === 'external';
+
+    // Ephemeral per-incident red/blue workroom, instantiated from the hotfix workroom template
+    await this.openIncidentWorkroom(record, targetHotfixRoomId).catch((err) => {
+      this.recordTrace({
+        id: `trace_workroom_${Date.now()}`,
+        timestamp: Date.now(),
+        agentId: this.sentinelClient.agentId,
+        agentName: this.sentinelClient.agentName,
+        direction: 'http_op',
+        frameType: 'op:create_room',
+        summary: `Workroom creation skipped: ${(err as Error).message.slice(0, 120)}`,
+        payload: {},
+      });
+    });
 
     await this.sentinelClient.sendTargetedMessage(
       targetHotfixRoomId,
       patcherHandle,
       [
-        `@${patcherHandle}${extraCoderMention} **[ESCALATE ${alert.incidentId} scenario=${alert.scenarioId}]**`,
-        `Reproduce & stage surgical fix for \`${alert.service}\` (\`${alert.deployedVersion}\`):`,
+        `@${patcherHandle}${external ? ` @${coder}` : ''} **[ESCALATE ${alert.incidentId} scenario=${alert.scenarioId} mode=${record.patchMode}]**`,
+        external
+          ? `@${coder}: you hold \`patch-author\` for this incident. Reproduce with the payload below against \`${this.opts.checkoutService.getBaseUrl()}/api/checkout\`, write the minimal fix, then hand the unified diff to @${patcherHandle} as a \`\`\`diff block in this room (or \`POST /api/incidents/${alert.incidentId}/stage-patch\`). @${patcherHandle} verifies it as \`red-team-verifier\`.`
+          : `Reproduce & stage surgical fix for \`${alert.service}\` (\`${alert.deployedVersion}\`):`,
         `- **Exception:** \`${alert.errorMessage}\``,
         `- **Suspect:** \`${alert.suspectedCommit.sha}\` at \`${alert.suspectedCommit.filePath}:${alert.suspectedCommit.line}\``,
         `- **Repro Payload:** \`${JSON.stringify(alert.reproductionPayload)}\``,
-      ].join('\n'),
+        record.workroom ? `- **Workroom:** \`#${record.workroom.roomName}\` (linked from \`#${this.teamPrefix}-hotfix\`)` : '',
+      ]
+        .filter(Boolean)
+        .join('\n'),
     );
+  }
+
+  /**
+   * Rooms as lifecycle objects: the sentinel instantiates `templates/vigil-hotfix-workroom.template.yaml`
+   * for each incident via `create_room`, links it from `#{team}-hotfix` via `link_rooms`, posts the
+   * template kickoff, and archives it via `archive_room` at closure.
+   */
+  private async openIncidentWorkroom(record: IncidentLedgerRecord, hotfixRoomId: string): Promise<void> {
+    const templatePath = path.resolve(process.cwd(), 'templates/vigil-hotfix-workroom.template.yaml');
+    const raw = YAML.parse(readFileSync(templatePath, 'utf8')) as {
+      room: Record<string, unknown>;
+      kickoff?: string;
+    };
+    const patcher = `${this.teamPrefix}-patcher`;
+    const gate = `${this.teamPrefix}-release-gate`;
+    const params: Record<string, string> = {
+      incident_id: record.incidentId,
+      patcher_agent: record.patchMode === 'external' ? this.getExternalCoderHandle() : patcher,
+      gate_agent: gate,
+      bridge: this.opts.bridgeName ?? 'Mattermost',
+      stack_trace: `${record.alert.errorMessage}\nSuspect commit ${record.alert.suspectedCommit.sha} (${record.alert.suspectedCommit.filePath}:${record.alert.suspectedCommit.line})`,
+      $creator: this.opts.creatorUsername ?? 'priya',
+    };
+    const fill = (v: unknown): string =>
+      String(v ?? '').replace(/\{(\$?[a-zA-Z0-9_-]+)\}/g, (m, k: string) => params[k] ?? m);
+
+    const room = raw.room;
+    const roles = Array.isArray(room.roles)
+      ? (room.roles as Array<Record<string, unknown>>).map((r) => ({
+          name: fill(r.name),
+          instructions: fill(r.instructions),
+          exclusive: Boolean(r.exclusive),
+        }))
+      : [];
+
+    const created = await this.sentinelClient.createRoom({
+      name: fill(room.name).toLowerCase(),
+      description: fill(room.description),
+      instructions: fill(room.instructions),
+      bridge: params.bridge,
+      channel_type: room.channel_type === 'channel_private' ? 'channel_private' : 'channel_public',
+      agents: [patcher, gate, this.sentinelClient.agentName],
+      users: [params.$creator],
+      roles,
+    });
+
+    await this.sentinelClient.linkRooms(hotfixRoomId, created.id, `per-incident red/blue workroom for ${record.incidentId}`);
+    record.workroom = { roomId: created.id, roomName: created.name, archived: false };
+    this.opts.onEventUpdate?.();
+
+    if (raw.kickoff) {
+      await this.sentinelClient.postMessage(created.id, fill(raw.kickoff).trim());
+    }
+  }
+
+  private async archiveIncidentWorkroom(record: IncidentLedgerRecord, outcome: string): Promise<void> {
+    if (!record.workroom || record.workroom.archived) return;
+    await this.sentinelClient.postMessage(
+      record.workroom.roomId,
+      `📦 **[${record.incidentId} CLOSED — ${outcome}]** Archiving this workroom. Durable artifacts live in \`#${this.teamPrefix}-hotfix\` (patch-verification-report) and \`#${this.teamPrefix}-releases\` (postmortem).`,
+    ).catch(() => undefined);
+    await this.sentinelClient.archiveRoom(record.workroom.roomId);
+    record.workroom.archived = true;
+    this.opts.onEventUpdate?.();
   }
 
   private wireSentinelHandlers(): void {
@@ -406,10 +577,14 @@ export class VigilMeshCoordinator {
           );
         }
 
+        if (rec) {
+          await this.archiveIncidentWorkroom(rec, mode === 'promote' ? `promoted ${version}` : `rolled back to ${version}`).catch(() => undefined);
+        }
+
         await this.sentinelClient.releaseRole(this.roomsByRole.incidentsRoomId, 'incident-commander');
         await this.sentinelClient.postMessage(
           this.roomsByRole.incidentsRoomId,
-          `✅ **[${incId} CLOSED]** Updated \`blast-radius-dossier\`, verified \`${version}\` recovery, and released \`incident-commander\` lease. Mesh back on standby.`,
+          `✅ **[${incId} CLOSED]** Updated \`blast-radius-dossier\`, verified \`${version}\` recovery${rec?.workroom ? `, archived \`#${rec.workroom.roomName}\`` : ''}, and released \`incident-commander\` lease. Mesh back on standby.`,
         );
         this.opts.onEventUpdate?.();
         return;
@@ -446,77 +621,64 @@ export class VigilMeshCoordinator {
       const body = event.payload.body;
 
       // Escalation handoff from Sentinel
-      const escalateMatch = body.match(/\[ESCALATE\s+(INC-[0-9A-Z-]+)\s+scenario=([a-z0-9_]+)\]/i);
+      const escalateMatch = body.match(/\[ESCALATE\s+(INC-[0-9A-Z-]+)\s+scenario=([a-z0-9_]+)(?:\s+mode=(auto|external))?\]/i);
       if (escalateMatch) {
         const incidentId = escalateMatch[1].toUpperCase();
         const scenarioId = escalateMatch[2] as FaultScenarioId;
+        const mode = (escalateMatch[3]?.toLowerCase() as PatchMode | undefined) ?? this.patchMode;
         const rec = this.incidents.get(incidentId);
         if (rec) {
           rec.stage = 'reproducing_patching';
+          rec.patchMode = mode;
           this.opts.onEventUpdate?.();
         }
 
         const hotfixRoomId = this.roomsByRole.hotfixRoomId;
-        await this.patcherClient.assumeRole(hotfixRoomId, 'patch-author');
         await this.patcherClient.loadInternalDocuments(hotfixRoomId);
 
-        // Execute real bug reproduction + candidate verification suite
-        const verification = this.opts.checkoutService.reproduceAndStagePatch(incidentId, scenarioId);
-        if (rec) {
-          rec.patchVerification = verification;
+        if (mode === 'external') {
+          // External coding agent authors the fix; Vigil's patcher takes the verifier seat.
+          await this.patcherClient.assumeRole(hotfixRoomId, 'red-team-verifier');
+          const coder = this.getExternalCoderHandle();
+          const alert = rec?.alert;
+          await this.patcherClient.postMessage(
+            hotfixRoomId,
+            [
+              `🧪 **[${incidentId} VERIFIER ARMED]** Holding \`red-team-verifier\`; \`patch-author\` is reserved for @${coder}.`,
+              alert ? `Independent reproduction on \`${alert.deployedVersion}\`: \`${alert.errorMessage}\`` : '',
+              `@${coder}: reply here with your unified diff in a \`\`\`diff fence addressed to @${this.patcherClient.agentName}, or \`POST ${this.opts.checkoutService.getBaseUrl().replace(/:\d+$/, ':' + (process.env.VIGIL_PORT || '4010'))}/api/incidents/${incidentId}/stage-patch\` with \`{ diffUnified, author }\`. I will run the regression matrix and hand off to \`#${this.teamPrefix}-releases\` only if it is green.`,
+            ]
+              .filter(Boolean)
+              .join('\n'),
+          );
+          return;
         }
 
-        const reportMarkdown = [
-          `# Patch Verification Report — ${incidentId}`,
-          `- **Candidate Version:** \`${verification.candidateVersion}\` (${verification.changedLines} lines across \`${verification.touchedFiles.join(', ')}\`)`,
-          `- **Deterministic Reproduction:** ${verification.reproConfirmed ? 'CONFIRMED' : 'FAILED'} — \`${verification.reproErrorOutput}\``,
-          '',
-          '## Unified Diff',
-          '```diff',
-          verification.diffUnified,
-          '```',
-          '',
-          '## Regression Matrix',
-          ...verification.testMatrix.map(
-            (t) => `- [${t.passed ? 'x' : ' '}] **${t.name}** — ${t.detail}`,
-          ),
-        ].join('\n');
+        await this.patcherClient.assumeRole(hotfixRoomId, 'patch-author');
+        const verification = this.opts.checkoutService.reproduceAndStagePatch(incidentId, scenarioId);
+        await this.completeVerificationAndHandoff(incidentId, verification, hotfixRoomId);
+        return;
+      }
 
-        await this.patcherClient.createRoomDocument(hotfixRoomId, {
-          name: 'patch-verification-report',
-          description: `Reproduction output, diff, and regression matrix for ${incidentId}`,
-          instructions: 'Inspected by Release Gate and human reviewers prior to canary promotion.',
-          content: reportMarkdown,
-        });
-
+      // External coder hands a diff to the verifier in chat: ```diff ... ```
+      const fence = body.match(/```(?:diff|patch)?\s*\n([\s\S]*?)```/i);
+      if (fence && /^(\+\+\+|---|@@|[+-])/m.test(fence[1])) {
+        const cited = body.match(/\b(INC-[0-9A-Z-]+)\b/i)?.[1]?.toUpperCase();
+        const active = cited ? this.incidents.get(cited) ?? this.getActiveIncident() : this.getActiveIncident();
+        if (!active) {
+          await this.patcherClient.postMessage(event.room_id, `No open incident to verify a patch against.`);
+          return;
+        }
+        const author = event.payload.sender_name || event.payload.sender;
         await this.patcherClient.postMessage(
-          hotfixRoomId,
-          [
-            `🔬 **[${incidentId} REPRODUCED & PATCH VERIFIED]**`,
-            `1. **Reproduced on \`v2.14.0\`:** \`${verification.reproErrorOutput}\``,
-            `2. **Staged Candidate \`${verification.candidateVersion}\`** (${verification.changedLines} lines changed in \`${verification.touchedFiles[0]}\`):`,
-            '```diff',
-            verification.diffUnified,
-            '```',
-            `3. **Verification Suite:** **${verification.testMatrix.filter((t) => t.passed).length}/${verification.testMatrix.length} passed** (USD, JPY, KRW, Promo Floor, Fraud Lock Release).`,
-            `Saved \`patch-verification-report\` room document. Handing off across room link -> \`#${this.teamPrefix}-releases\`.`,
-          ].join('\n'),
+          event.room_id,
+          `📥 **[${active.incidentId} CANDIDATE RECEIVED]** from \`${author}\` (${event.payload.sender}). Running reproduction + regression matrix as \`red-team-verifier\`…`,
         );
-
-        const links = await this.patcherClient.listLinkedRooms(hotfixRoomId);
-        const releaseLink = links.find(
-          (l) => l.from_room_id === hotfixRoomId && l.to_room_name.includes('releases'),
-        );
-        const targetReleaseRoomId = releaseLink?.to_room_id ?? this.roomsByRole.releasesRoomId;
-        const gateHandle = `${this.teamPrefix}-release-gate`;
-
-        await this.patcherClient.releaseRole(hotfixRoomId, 'patch-author');
-
-        await this.patcherClient.sendTargetedMessage(
-          targetReleaseRoomId,
-          gateHandle,
-          `@${gateHandle} **[HANDOFF ${incidentId}]** Candidate \`${verification.candidateVersion}\` (${verification.changedLines} lines, ${verification.testMatrix.length}/${verification.testMatrix.length} green tests) staged and ready for human release gate.`,
-        );
+        const verification = this.opts.checkoutService.stageExternalPatch(active.incidentId, active.scenarioId, {
+          diffUnified: fence[1],
+          author,
+        });
+        await this.completeVerificationAndHandoff(active.incidentId, verification, this.roomsByRole.hotfixRoomId);
         return;
       }
 
@@ -535,6 +697,233 @@ export class VigilMeshCoordinator {
         }
       }
     });
+  }
+
+  /** HTTP intake used by coding agents that call `POST /api/incidents/{id}/stage-patch` (see CLAUDE.md). */
+  public async stageExternalPatchViaApi(
+    incidentId: string,
+    submission: { diffUnified: string; author?: string; touchedFiles?: string[] },
+  ): Promise<PatchVerificationResult> {
+    const rec = this.incidents.get(incidentId.toUpperCase());
+    if (!rec) throw new Error(`Unknown incident ${incidentId}`);
+    if (rec.resolvedAt !== null) throw new Error(`${rec.incidentId} is already resolved`);
+    const author = submission.author?.trim() || this.getExternalCoderHandle();
+    const hotfixRoomId = this.roomsByRole.hotfixRoomId;
+    await this.patcherClient.assumeRole(hotfixRoomId, 'red-team-verifier').catch(() => undefined);
+    await this.patcherClient.postMessage(
+      hotfixRoomId,
+      `📥 **[${rec.incidentId} CANDIDATE RECEIVED via stage-patch API]** author=\`${author}\`. Running reproduction + regression matrix as \`red-team-verifier\`…`,
+    );
+    const verification = this.opts.checkoutService.stageExternalPatch(rec.incidentId, rec.scenarioId, {
+      diffUnified: submission.diffUnified,
+      author,
+      touchedFiles: submission.touchedFiles,
+    });
+    await this.completeVerificationAndHandoff(rec.incidentId, verification, hotfixRoomId);
+    return verification;
+  }
+
+  /** Shared tail of the patch stage: report doc, chat summary, release of leases, handoff (or hold) to the gate. */
+  private async completeVerificationAndHandoff(
+    incidentId: string,
+    verification: PatchVerificationResult,
+    hotfixRoomId: string,
+  ): Promise<void> {
+    const rec = this.incidents.get(incidentId);
+    if (rec) {
+      rec.patchVerification = verification;
+      this.opts.onEventUpdate?.();
+    }
+    const external = verification.source === 'external-coder';
+    const passed = verification.testMatrix.filter((t) => t.passed).length;
+    const total = verification.testMatrix.length;
+
+    const reportMarkdown = [
+      `# Patch Verification Report — ${incidentId}`,
+      `- **Author:** \`${verification.author}\` (${external ? 'external coding agent via Switch' : 'vigil-patcher'}) · **Verifier:** \`${this.patcherClient.agentName}\``,
+      `- **Candidate Version:** \`${verification.candidateVersion}\` (${verification.changedLines} lines across \`${verification.touchedFiles.join(', ') || 'n/a'}\`)`,
+      `- **Deterministic Reproduction:** ${verification.reproConfirmed ? 'CONFIRMED' : 'FAILED'} — \`${verification.reproErrorOutput}\``,
+      `- **Verdict:** ${verification.allPassed ? `GREEN ${passed}/${total}` : `RED ${passed}/${total} — not eligible for promotion`}`,
+      '',
+      '## Unified Diff',
+      '```diff',
+      verification.diffUnified,
+      '```',
+      '',
+      '## Regression Matrix',
+      ...verification.testMatrix.map((t) => `- [${t.passed ? 'x' : ' '}] **${t.name}** — ${t.detail}`),
+    ].join('\n');
+
+    await this.patcherClient.createRoomDocument(hotfixRoomId, {
+      name: 'patch-verification-report',
+      description: `Reproduction output, diff, and regression matrix for ${incidentId}`,
+      instructions: 'Inspected by Release Gate and human reviewers prior to canary promotion.',
+      content: reportMarkdown,
+    });
+
+    if (rec?.workroom && !rec.workroom.archived) {
+      await this.patcherClient
+        .postMessage(
+          rec.workroom.roomId,
+          `🔵 **Blue team verdict for ${incidentId}:** ${verification.allPassed ? 'GREEN' : 'RED'} ${passed}/${total} · candidate \`${verification.candidateVersion}\` by \`${verification.author}\`. Full report: \`patch-verification-report\` in \`#${this.teamPrefix}-hotfix\`.`,
+        )
+        .catch(() => undefined);
+    }
+
+    if (!verification.allPassed) {
+      await this.patcherClient.postMessage(
+        hotfixRoomId,
+        [
+          `⛔ **[${incidentId} CANDIDATE REJECTED — ${passed}/${total}]** Candidate from \`${verification.author}\` does not clear the regression matrix:`,
+          ...verification.testMatrix.filter((t) => !t.passed).map((t) => `- ✗ **${t.name}** — ${t.detail}`),
+          `Holding in \`#${this.teamPrefix}-hotfix\`. Submit a corrected diff; nothing reaches \`#${this.teamPrefix}-releases\` until it is green.`,
+        ].join('\n'),
+      );
+      return;
+    }
+
+    await this.patcherClient.postMessage(
+      hotfixRoomId,
+      [
+        `🔬 **[${incidentId} REPRODUCED & PATCH VERIFIED]**${external ? ` — candidate authored by \`${verification.author}\`` : ''}`,
+        `1. **Reproduced on \`v2.14.0\`:** \`${verification.reproErrorOutput}\``,
+        `2. **Staged Candidate \`${verification.candidateVersion}\`** (${verification.changedLines} lines changed in \`${verification.touchedFiles[0] ?? 'n/a'}\`):`,
+        '```diff',
+        verification.diffUnified,
+        '```',
+        `3. **Verification Suite:** **${passed}/${total} passed**.`,
+        `Saved \`patch-verification-report\` room document. Handing off across room link -> \`#${this.teamPrefix}-releases\`.`,
+      ].join('\n'),
+    );
+
+    const links = await this.patcherClient.listLinkedRooms(hotfixRoomId);
+    const releaseLink = links.find((l) => l.from_room_id === hotfixRoomId && l.to_room_name.includes('releases'));
+    const targetReleaseRoomId = releaseLink?.to_room_id ?? this.roomsByRole.releasesRoomId;
+    const gateHandle = `${this.teamPrefix}-release-gate`;
+
+    await this.patcherClient.releaseRole(hotfixRoomId, external ? 'red-team-verifier' : 'patch-author');
+
+    await this.patcherClient.sendTargetedMessage(
+      targetReleaseRoomId,
+      gateHandle,
+      `@${gateHandle} **[HANDOFF ${incidentId}]** Candidate \`${verification.candidateVersion}\` by \`${verification.author}\` (${verification.changedLines} lines, ${passed}/${total} green tests) staged and ready for human release gate.`,
+    );
+  }
+
+  /** Read the live `release-safety-policy` room document and parse it into gate parameters. */
+  private async loadReleasePolicy(): Promise<ReleasePolicy> {
+    try {
+      const docs = await this.releaseGateClient.loadInternalDocuments(this.roomsByRole.releasesRoomId);
+      const doc = docs.find((d) => d.name === 'release-safety-policy');
+      this.releasePolicy = ReleaseSafetyGate.parsePolicyDocument(doc?.content);
+    } catch {
+      // keep last known policy
+    }
+    return this.releasePolicy;
+  }
+
+  private async writeReleasePolicy(policy: ReleasePolicy, changedBy: string): Promise<void> {
+    const roomId = this.roomsByRole.releasesRoomId;
+    const content = ReleaseSafetyGate.renderPolicyDocument(policy, changedBy);
+    try {
+      await this.releaseGateClient.updateRoomDocument(roomId, 'release-safety-policy', content);
+    } catch {
+      await this.releaseGateClient.createRoomDocument(roomId, {
+        name: 'release-safety-policy',
+        description: 'Zero-LLM deterministic release gate invariants',
+        instructions: 'Enforced on every production deployment or rollback.',
+        content,
+      });
+    }
+    this.releasePolicy = policy;
+    this.opts.onEventUpdate?.();
+  }
+
+  // ---------------------------------------------------------------------------------------------
+  // Incident-commander failover (exclusive lease + `taken_over` fencing + cursor resume)
+  // ---------------------------------------------------------------------------------------------
+
+  /** Chaos: wedge the live sentinel process. Its socket stays open but it stops answering pings. */
+  public crashSentinel(): { connectionId: string; generation: number | null; cursor: number } {
+    this.sentinelClient.simulateHang();
+    this.opts.onEventUpdate?.();
+    return {
+      connectionId: this.sentinelClient.connectionId,
+      generation: this.sentinelClient.getGeneration() ?? null,
+      cursor: this.sentinelClient.getCursor(),
+    };
+  }
+
+  /**
+   * Standby takeover: a fresh sentinel process reopens the SAME `connection_id` from the last
+   * acknowledged cursor. The server evicts the wedged socket with `evicted: taken_over` (which the
+   * old client treats as final), the new generation resumes the event stream without gaps, and the
+   * exclusive `incident-commander` lease is re-asserted so the open incident keeps its commander.
+   */
+  public async failoverSentinel(): Promise<SentinelFailoverRecord> {
+    if (!this.sentinelCreds) throw new Error('Sentinel credentials unavailable');
+    const old = this.sentinelClient;
+    const previousGeneration = old.getGeneration() ?? null;
+    const resumedFromCursor = old.getCursor();
+
+    const standby = new SwitchAgentClient({
+      baseUrl: this.opts.switchServerUrl,
+      agentId: this.sentinelCreds.id,
+      agentName: old.agentName,
+      apiKey: this.sentinelCreds.api_key,
+      connectionId: old.connectionId,
+      initialCursor: resumedFromCursor,
+      scope: 'all',
+      filter: 'all',
+      onTrace: this.recordTrace,
+      clientName: 'vigil-switch-sdk-standby',
+    });
+
+    this.retiredSentinels.push(old);
+    this.sentinelClient = standby;
+    this.wireSentinelHandlers();
+    await standby.discoverOperations();
+    await standby.connect();
+
+    // Give the server a beat to deliver `evicted: taken_over` to the wedged socket.
+    await new Promise((r) => setTimeout(r, 150));
+
+    const active = this.getActiveIncident();
+    let leaseReclaimed = false;
+    if (active && active.resolvedAt === null) {
+      try {
+        await standby.assumeRole(this.roomsByRole.incidentsRoomId, 'incident-commander');
+        leaseReclaimed = true;
+      } catch {
+        leaseReclaimed = false;
+      }
+    }
+
+    const ctx = await standby.readContext(this.roomsByRole.incidentsRoomId, 10).catch(() => null);
+    const record: SentinelFailoverRecord = {
+      at: Date.now(),
+      trigger: 'chaos_hang',
+      previousGeneration,
+      newGeneration: standby.getGeneration() ?? null,
+      resumedFromCursor,
+      leaseReclaimed,
+      previousConnectionEvicted: old.isStoppedPermanently(),
+    };
+    this.failovers.push(record);
+
+    await standby.postMessage(
+      this.roomsByRole.incidentsRoomId,
+      [
+        `♻️ **[INCIDENT-COMMANDER FAILOVER]** Standby sentinel took over connection \`${old.connectionId.slice(0, 8)}…\`.`,
+        `- Previous generation \`${previousGeneration ?? '-'}\` evicted with \`taken_over\` (${record.previousConnectionEvicted ? 'confirmed' : 'pending'}); now generation \`${record.newGeneration ?? '-'}\`.`,
+        `- Resumed event stream from cursor \`${resumedFromCursor}\` (${ctx ? `${ctx.messages.length} recent messages re-read` : 'context re-read skipped'}).`,
+        active && active.resolvedAt === null
+          ? `- Exclusive \`incident-commander\` lease for \`${active.incidentId}\` ${leaseReclaimed ? 're-asserted — incident keeps its commander' : 'could NOT be reclaimed'}.`
+          : '- No open incident; standing by.',
+      ].join('\n'),
+    );
+    this.opts.onEventUpdate?.();
+    return record;
   }
 
   private wireReleaseGateHandlers(): void {
@@ -565,7 +954,8 @@ export class VigilMeshCoordinator {
           [
             `🛡️ **[HUMAN RELEASE GATE — ${incidentId}]** @${operator}`,
             `- **Incident:** ${rec.title} (Commit \`${rec.alert.suspectedCommit.sha}\`)`,
-            `- **Candidate Patch:** \`${v?.candidateVersion ?? 'v2.14.1-hotfix'}\` · \`${v?.changedLines ?? 0}\` changed lines · **${v?.testMatrix.filter((t) => t.passed).length ?? 0}/${v?.testMatrix.length ?? 0}** verification vectors green`,
+            `- **Candidate Patch:** \`${v?.candidateVersion ?? 'v2.14.1-hotfix'}\` by \`${v?.author ?? 'vigil-patcher'}\` · \`${v?.changedLines ?? 0}\` changed lines · **${v?.testMatrix.filter((t) => t.passed).length ?? 0}/${v?.testMatrix.length ?? 0}** verification vectors green`,
+            `- **Room Policy:** max \`${this.releasePolicy.maxChangedLines}\` lines · approvers \`${this.releasePolicy.allowedApprovers.join(', ')}\` (edit via \`set max diff N\`)`,
             `- **Fallback Baseline:** \`${rec.alert.lastKnownGoodVersion}\` (instant zero-migration rollback)`,
             '',
             `**Action Required (Verified Human Only — Agent approvals blocked):**`,
@@ -576,13 +966,82 @@ export class VigilMeshCoordinator {
         return;
       }
 
+      // 1b. Policy governance from chat: humans edit the `release-safety-policy` room document; agents may not.
+      const policyCmd = ReleaseSafetyGate.parsePolicyCommand(body);
+      if (policyCmd) {
+        const senderIsAgent = ReleaseSafetyGate.evaluate({
+          senderParticipantId: event.payload.sender,
+          senderName: event.payload.sender_name,
+          messageBody: 'approve INC-0000 promote',
+          activeIncidentId: 'INC-0000',
+          knownAgentParticipantIds: this.knownAgentParticipantIds,
+          knownAgentNames: this.knownAgentNames,
+          patchVerification: null,
+        }).reasonCode === 'REJECTED_AGENT_SENDER';
+
+        if (senderIsAgent) {
+          this.policyAudit.push({
+            at: Date.now(),
+            senderName: event.payload.sender_name,
+            senderParticipantId: event.payload.sender,
+            accepted: false,
+            summary: `BLOCKED ${policyCmd.summary}`,
+          });
+          this.opts.onEventUpdate?.();
+          await this.releaseGateClient.postMessage(
+            event.room_id,
+            `⛔ **[POLICY CHANGE BLOCKED — REJECTED_AGENT_SENDER]** \`${event.payload.sender_name}\` is an agent identity. Only verified humans may edit \`release-safety-policy\`.`,
+          );
+          return;
+        }
+
+        const current = await this.loadReleasePolicy();
+        const next = ReleaseSafetyGate.applyPolicyCommand(current, policyCmd);
+        await this.writeReleasePolicy(next, event.payload.sender_name);
+        this.policyAudit.push({
+          at: Date.now(),
+          senderName: event.payload.sender_name,
+          senderParticipantId: event.payload.sender,
+          accepted: true,
+          summary: policyCmd.summary,
+        });
+        this.opts.onEventUpdate?.();
+        await this.releaseGateClient.postMessage(
+          event.room_id,
+          [
+            `📜 **[POLICY UPDATED by ${event.payload.sender_name}]** ${policyCmd.summary}`,
+            `Wrote \`release-safety-policy\` room document (\`update_room_document\`). Effective on the next approval evaluation.`,
+            `- max_changed_lines: \`${next.maxChangedLines}\` · forbidden_paths: \`${next.forbiddenPaths.join(', ') || 'none'}\` · require_green_matrix: \`${next.requireGreenMatrix}\` · allowed_approvers: \`${next.allowedApprovers.join(', ')}\``,
+          ].join('\n'),
+        );
+        return;
+      }
+
+      if (/\b(policy|show policy)\b/i.test(body) && !/\b(approve|ship|execute|rollback)\b/i.test(body)) {
+        const pol = await this.loadReleasePolicy();
+        await this.releaseGateClient.postMessage(
+          event.room_id,
+          [
+            `📜 **Live release policy** (read from \`release-safety-policy\` room document):`,
+            `- max_changed_lines: \`${pol.maxChangedLines}\``,
+            `- forbidden_paths: \`${pol.forbiddenPaths.join(', ') || 'none'}\``,
+            `- require_green_matrix: \`${pol.requireGreenMatrix}\``,
+            `- allowed_approvers: \`${pol.allowedApprovers.join(', ')}\``,
+            `- min_canary_probes: \`${pol.minCanaryProbes}\``,
+            `Change it (humans only): \`set max diff 60\`, \`set approvers priya,sam\`, \`set forbidden paths .env,secret\`, \`set green matrix off\`.`,
+          ].join('\n'),
+        );
+        return;
+      }
+
       // 2. Evaluate approval / rollback command through deterministic Zero-LLM ReleaseSafetyGate
       const active = this.getActiveIncident();
       if (!active || active.resolvedAt !== null) {
-        if (/\b(policy|status|help)\b/i.test(body)) {
+        if (/\b(status|help)\b/i.test(body)) {
+          const pol = this.releasePolicy;
           await this.releaseGateClient.postMessage(
             event.room_id,
-            `🛡️ **Vigil Release Gate:** Standby (no active gated incident). Invariants enforced: Human-only sign-off (\`@switch-user-*\`), incident ID binding, 100% green test matrix, <40-line diff cap, and 5-probe post-deploy canary verification.`,
+            `🛡️ **Vigil Release Gate:** Standby (no active gated incident). Invariants enforced: Human-only sign-off (\`@switch-user-*\`), incident ID binding, green test matrix (${pol.requireGreenMatrix ? 'required' : 'advisory'}), <${pol.maxChangedLines}-line diff cap, approvers \`${pol.allowedApprovers.join(', ')}\`, and ${pol.minCanaryProbes}-probe post-deploy canary verification.`,
           );
         }
         return;
@@ -590,6 +1049,7 @@ export class VigilMeshCoordinator {
 
       // Only run gate evaluation when message attempts an approval/rollback or comes from an agent trying to approve
       if (/\b(approve|ship|execute|rollback)\b/i.test(body)) {
+        const policy = await this.loadReleasePolicy();
         const decision = ReleaseSafetyGate.evaluate({
           senderParticipantId: event.payload.sender,
           senderName: event.payload.sender_name,
@@ -598,6 +1058,7 @@ export class VigilMeshCoordinator {
           knownAgentParticipantIds: this.knownAgentParticipantIds,
           knownAgentNames: this.knownAgentNames,
           patchVerification: active.patchVerification,
+          policy,
         });
 
         active.gateDecisions.push({
@@ -632,7 +1093,8 @@ export class VigilMeshCoordinator {
         const postmortemDoc = [
           `# Blameless Postmortem — ${active.incidentId}`,
           `- **Incident:** ${active.title}`,
-          `- **Resolution Action:** \`${decision.action.toUpperCase()}\` -> \`${outcome.deployedVersion}\` (Approved by human \`${event.payload.sender_name}\`)`,
+          `- **Resolution Action:** \`${decision.action.toUpperCase()}\` -> \`${outcome.deployedVersion}\` (Approved by human \`${event.payload.sender_name}\`; candidate authored by \`${active.patchVerification?.author ?? 'n/a'}\`)`,
+          `- **Workroom:** ${active.workroom ? `\`#${active.workroom.roomName}\` (archived at closure)` : 'none'}`,
           `- **Time to Resolution (MTTR):** ${durationSec}s across linked Switch rooms`,
           `- **Root Cause:** Commit \`${active.alert.suspectedCommit.sha}\` (\`${active.alert.suspectedCommit.filePath}:${active.alert.suspectedCommit.line}\`) — ${active.alert.errorMessage}`,
           `- **Post-Deploy Synthetic Canary:** ${outcome.canaryReport.probesPassed}/${outcome.canaryReport.probesRun} probes \`200 OK\` (max latency ${outcome.canaryReport.maxLatencyMs}ms)`,
