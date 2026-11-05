@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ArrowRight, ArrowUpRight, Plus } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, Plus, X } from 'lucide-react';
 import './landing.css';
 import { VigilMark } from './VigilMark';
 
@@ -102,6 +102,19 @@ export function Landing({ onLaunch }: { onLaunch: () => void }) {
 
   useReveal(rootRef);
 
+  // Mobile drawer: Esc closes it, and the page behind it does not scroll while it is open.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setMenuOpen(false);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [menuOpen]);
+
   // Sticky header once the hero has scrolled away.
   useEffect(() => {
     const hero = heroRef.current;
@@ -144,13 +157,74 @@ export function Landing({ onLaunch }: { onLaunch: () => void }) {
             </a>
           ))}
         </nav>
-        <button type="button" className="vl-btn vl-btn--dark" onClick={onLaunch}>
-          <span>Launch App</span>
-          <span className="vl-btn-icon">
-            <ArrowRight />
-          </span>
+        <button
+          type="button"
+          className={`vl-burger vl-burger--sticky ${menuOpen ? 'is-open' : ''}`}
+          aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+          aria-expanded={menuOpen}
+          aria-controls="vl-drawer"
+          tabIndex={stickyShown ? 0 : -1}
+          onClick={() => setMenuOpen((v) => !v)}
+        >
+          <span />
+          <span />
+          <span />
         </button>
       </header>
+
+      {/* ───────────────────────── Mobile drawer ───────────────────────── */}
+      <button
+        type="button"
+        className={`vl-backdrop ${menuOpen ? 'is-open' : ''}`}
+        aria-label="Close menu"
+        tabIndex={menuOpen ? 0 : -1}
+        onClick={() => setMenuOpen(false)}
+      />
+      <nav id="vl-drawer" className={`vl-drawer ${menuOpen ? 'is-open' : ''}`} aria-label="Menu" aria-hidden={!menuOpen}>
+        <div className="vl-drawer-head">
+          <span className="vl-logo">
+            <VigilMark />
+            Vigil
+          </span>
+          <button type="button" className="vl-drawer-close" aria-label="Close menu" onClick={() => setMenuOpen(false)}>
+            <X />
+          </button>
+        </div>
+        <div className="vl-drawer-links">
+          {SECTIONS.map((s, i) => (
+            <a
+              key={s.id}
+              href={`#${s.id}`}
+              tabIndex={menuOpen ? 0 : -1}
+              className={active === s.id ? 'is-active' : ''}
+              onClick={() => setMenuOpen(false)}
+            >
+              <span className="mono">{String(i + 1).padStart(2, '0')}</span>
+              {s.label}
+            </a>
+          ))}
+        </div>
+        <div className="vl-drawer-foot">
+          <span className="vl-drawer-status">
+            <span className={`vl-square ${t?.status === 'degraded' ? 'vl-square--alert' : ''}`} />
+            {t ? `checkout-api ${t.deployedVersion} · ${t.status}` : 'Connecting to the live instance'}
+          </span>
+          <button
+            type="button"
+            className="vl-btn vl-btn--dark"
+            tabIndex={menuOpen ? 0 : -1}
+            onClick={() => {
+              setMenuOpen(false);
+              onLaunch();
+            }}
+          >
+            <span>Launch App</span>
+            <span className="vl-btn-icon">
+              <ArrowRight />
+            </span>
+          </button>
+        </div>
+      </nav>
 
       {/* ───────────────────────── Hero ───────────────────────── */}
       <section className="vl-hero" id="top" ref={heroRef}>
@@ -162,23 +236,18 @@ export function Landing({ onLaunch }: { onLaunch: () => void }) {
             Vigil
           </a>
           <nav className="vl-navlinks" aria-label="Primary">
-            {SECTIONS.slice(0, 5).map((s, i) => (
+            {SECTIONS.map((s, i) => (
               <a key={s.id} href={`#${s.id}`} className="vl-navlink" style={{ ['--d' as string]: `${0.04 + i * 0.06}s` }}>
                 {s.label}
               </a>
             ))}
           </nav>
-          <button type="button" className="vl-btn vl-btn--light vl-navcta" onClick={onLaunch}>
-            <span>Launch App</span>
-            <span className="vl-btn-icon">
-              <ArrowRight />
-            </span>
-          </button>
           <button
             type="button"
-            className="vl-burger"
-            aria-label="Open menu"
+            className={`vl-burger ${menuOpen ? 'is-open' : ''}`}
+            aria-label={menuOpen ? 'Close menu' : 'Open menu'}
             aria-expanded={menuOpen}
+            aria-controls="vl-drawer"
             onClick={() => setMenuOpen((v) => !v)}
           >
             <span />
@@ -186,24 +255,6 @@ export function Landing({ onLaunch }: { onLaunch: () => void }) {
             <span />
           </button>
         </header>
-        {menuOpen && (
-          <nav className="vl-mobile" aria-label="Mobile">
-            {SECTIONS.map((s) => (
-              <a key={s.id} href={`#${s.id}`} onClick={() => setMenuOpen(false)}>
-                {s.label}
-              </a>
-            ))}
-            <a
-              href="/app"
-              onClick={(e) => {
-                e.preventDefault();
-                onLaunch();
-              }}
-            >
-              Launch App →
-            </a>
-          </nav>
-        )}
 
         <main className="vl-hero-main">
           <div className="vl-badge vl-badge--glass vl-wipe is-in" style={{ ['--d' as string]: '0.18s' }}>
