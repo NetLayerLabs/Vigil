@@ -355,6 +355,29 @@ export function Landing({ onLaunch }: { onLaunch: () => void }) {
               body="Zero-LLM gate: only a verified @switch-user-* teammate can promote or roll back. Agent self-approvals return REJECTED_AGENT_SENDER."
             />
           </div>
+
+          <div className="mt-14 grid md:grid-cols-2 gap-5">
+            <Differentiator
+              tag="Your agent, verified"
+              title="Claude Code writes the fix. Vigil checks it."
+              body="Bind the coding agent you already use into #vigil-hotfix through Switch Console. Vigil's patcher steps back into the red-team-verifier seat, reproduces independently, and runs the regression matrix on the diff your agent actually wrote. A diff without the fix is rejected before it reaches the gate."
+            />
+            <Differentiator
+              tag="Governance in the room"
+              title="Release policy is a Switch room document."
+              body="The gate re-reads release-safety-policy on every approval. Type `set max diff 4` or `set approvers sam` in chat and the next decision follows the new rules. Agents that try to edit policy are blocked."
+            />
+            <Differentiator
+              tag="Lease failover"
+              title="Crash the incident commander. Nothing is lost."
+              body="A wedged sentinel is evicted with taken_over. A standby reopens the same connection_id from the last cursor, picks up a new generation, and re-asserts the exclusive incident-commander lease mid-incident."
+            />
+            <Differentiator
+              tag="Rooms with a lifecycle"
+              title="One ephemeral workroom per incident."
+              body="Each SEV-1 gets a #hotfix-inc-xxxx red/blue room created from a Switch template, linked from #vigil-hotfix, and archived at closure. Rooms become part of the audit trail instead of static channels."
+            />
+          </div>
         </div>
       </section>
 
@@ -609,6 +632,16 @@ function StageCard(props: {
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+function Differentiator({ tag, title, body }: { tag: string; title: string; body: string }) {
+  return (
+    <div className="rounded-2xl border border-emerald-500/25 bg-gradient-to-br from-emerald-500/10 to-slate-900/60 p-6 hover:border-emerald-500/50 transition">
+      <div className="text-[11px] font-mono uppercase tracking-wider text-emerald-300">{tag}</div>
+      <div className="mt-2 text-lg font-semibold text-white">{title}</div>
+      <p className="mt-3 text-sm text-slate-300 leading-relaxed">{body}</p>
     </div>
   );
 }
