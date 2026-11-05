@@ -120,6 +120,6 @@ npm run build
 npm start
 ```
 
-Open `http://localhost:4010`, click **Launch App**, inject a chaos release, flip the patcher toggle to the external coder, paste a diff into the intake, tighten the policy from the chat bar, crash and fail over the sentinel, then approve as Priya and watch the canary probes and the postmortem land. The test suite covers every one of those paths.
+Open `http://localhost:4010`, click **Open the War Room**, inject a chaos release, set the patch author to the external coder, paste a diff into the intake, tighten the policy from the chat bar, crash and fail over the sentinel, then approve as Priya and watch the canary probes and the postmortem land. The test suite covers every one of those paths.
 
 The repo: https://github.com/mrnetwork0001/Vigil
