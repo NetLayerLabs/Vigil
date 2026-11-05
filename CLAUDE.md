@@ -21,19 +21,29 @@ triage, verification and the human release gate; your job is the fix itself.
 - Post the exact failing HTTP status and error line in `#vigil-hotfix` (or the per-incident
   `#hotfix-inc-xxxx` workroom) before you patch.
 
-## 3. Write the minimal fix and hand it to the verifier
+## 3. Write the minimal fix in the live working copy and hand it to the verifier
+- The service that is actually running is **not** `services/checkout-api` in this repo. Vigil runs it from a
+  git-backed working copy whose path is in the escalation message (by default
+  `.vigil-state/checkout-api-live-4020`). `HEAD` there is the regression commit; `git log -3` and
+  `git show HEAD` tell you exactly what shipped. Edit `src/cartPricing.ts` **in that working copy**.
+- Run the service's real tests there before handing off:
+  ```bash
+  cd .vigil-state/checkout-api-live-4020 && node --import tsx --test test/cartPricing.test.ts
+  ```
 - Keep the diff surgical (the room policy caps changed lines; default 40). Never touch `.env`,
   auth keys, migrations, or deployment state.
-- Hand your **unified diff** to `@vigil-patcher` either way:
-  - **In chat (preferred, Switch-native):** post in `#vigil-hotfix`, addressed to `@vigil-patcher`, with the
-    diff inside a ```` ```diff ```` fence and the incident ID in the message.
+- Hand off to `@vigil-patcher` in one of three ways:
+  - **Edit in place, then ask for verification (simplest):** leave your edits uncommitted in the working copy
+    and post `@vigil-patcher verify INC-xxxx` in `#vigil-hotfix`. The verifier commits them as the candidate.
+  - **Post the diff in chat:** `git diff` in the working copy, then post it addressed to `@vigil-patcher` inside a
+    ```` ```diff ```` fence with the incident ID.
   - **Over HTTP:** `POST http://localhost:4010/api/incidents/INC-xxxx/stage-patch` with JSON
-    `{ "diffUnified": "<unified diff>", "author": "claude-code" }`. `200` means verified and handed to the
-    gate; `422` means the regression matrix rejected it (the body lists the failing vectors).
-- `@vigil-patcher` reproduces independently, runs the regression matrix (currency scale, promo ledger
-  floor, inventory lock release, plus "fault no longer reproduces"), writes `patch-verification-report`,
-  and only then escalates to `#vigil-releases`. A diff that does not carry the fix is rejected; submit a
-  corrected one.
+    `{ "diffUnified": "<unified diff>", "author": "claude-code" }`. `200` = verified and handed to the gate;
+    `422` = rejected (body lists the failing checks).
+- `@vigil-patcher` reproduces against the live process, commits your candidate, runs the real
+  `node --test` suite, boots the candidate on a staging port and replays the production payload, writes
+  `patch-verification-report`, and only then escalates to `#vigil-releases`. A red candidate is discarded
+  (`git reset --hard` to the regression commit); fix and hand off again.
 
 ## 4. Stop at the human gate
 - Do **not** approve, promote or roll back anything. `@vigil-release-gate` deterministically rejects
