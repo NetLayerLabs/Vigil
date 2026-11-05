@@ -39,6 +39,14 @@ flowchart LR
   R3 -->|"5/5 Synthetic Canary Probes (200 OK)"| API
 ```
 
+### What Makes Vigil Different
+| | Feature | Switch primitive doing the work |
+|---|---|---|
+| 🤝 | **Your coding agent is the patcher.** Flip `patcher` to *external* and `@vigil-sentinel` hands the incident to the Claude Code / Codex session you bound into `#vigil-hotfix` via Switch Console ([`CLAUDE.md`](./CLAUDE.md) briefs it). `@vigil-patcher` steps back into `red-team-verifier`, reproduces independently, runs the regression matrix on *the diff your agent actually wrote*, and rejects anything that doesn't carry the fix. | role leases (`patch-author` vs `red-team-verifier`), `post_message` diff hand-off, `create_room_document` |
+| 📜 | **Release policy lives in a Switch room document, not in code.** The gate re-reads `release-safety-policy` on every approval. Priya types `@vigil-release-gate set max diff 4` or `set approvers sam` in chat and the next approval is judged by the new rules. Agents trying to edit policy are blocked. | `load_internal_documents`, `update_room_document`, human-only authorship |
+| ♻️ | **Incident-commander failover.** Click *Crash Sentinel* mid-incident: the socket stays open but stops answering pings. *Failover Sentinel* reopens the **same `connection_id`** from the last cursor; the server evicts the wedged client with `evicted: taken_over` (final), the new generation resumes without gaps and re-asserts the exclusive `incident-commander` lease. | WebSocket generation fencing, `taken_over`, cursor resume, exclusive `assume_role` |
+| 📦 | **Rooms as lifecycle objects.** Every incident gets an ephemeral `#hotfix-inc-xxxx` red/blue workroom instantiated from [`templates/vigil-hotfix-workroom.template.yaml`](./templates/vigil-hotfix-workroom.template.yaml), linked from `#vigil-hotfix`, and archived at closure. | `create_room`, `link_rooms`, `archive_room` |
+
 ### Native Switch Primitives Used End-to-End
 1. **Switch v1 Group & Room YAML Templates ([`templates/vigil-war-room.template.yaml`](./templates/vigil-war-room.template.yaml)):** Provisions all 3 rooms, 3 agents (`allow_existing: true` + managed coding provider fallback `[claude, antigravity, codex, opencode, cursor]`), exclusive roles, room documents, service references, aliases, kickoffs, and directed room links in one click.
 2. **Custom Switch WebSocket + HTTP Agent Protocol SDK ([`src/protocol/switchClient.ts`](./src/protocol/switchClient.ts)):**
@@ -72,6 +80,11 @@ Open **`http://localhost:4010`** — this is the **Vigil landing page** (problem
 2. Watch `@vigil-sentinel` → `@vigil-patcher` → `@vigil-release-gate` collaborate across `#vigil-incidents`, `#vigil-hotfix`, and `#vigil-releases` over real WebSockets, inspect the live **WS Protocol Frames**, and read the generated **Room Docs**.
 3. Click **Test Rogue Agent Block** to see the deterministic safety gate block an AI agent trying to approve its own release (`REJECTED_AGENT_SENDER`).
 4. Click **Approve & Promote Hotfix (as Priya)** (or type `@vigil-release-gate approve INC-2041 promote` in the chat bar) to promote `v2.14.1-hotfix`, run 5 real HTTP synthetic canary probes against `http://localhost:4020/api/checkout`, and generate the blameless postmortem!
+5. **Go further:**
+   - Flip **patcher → @claude-code (Switch Console)** in the chaos strip, trigger a scenario, and use the **External patch intake** panel (Patch & Canary tab) to hand a diff to `@vigil-patcher`. Try **Load bad diff** first to watch the verifier reject it, then **Load reference fix**.
+   - In `#vigil-releases` send `@vigil-release-gate set max diff 1`, then approve: the gate rejects the patch with `REJECTED_DIFF_POLICY_VIOLATION` because the room document now says so. `set max diff 60` and approve again.
+   - Mid-incident, click **Crash Sentinel** then **Failover Sentinel** and watch the **WS Protocol** tab for `evicted: taken_over` and the new generation re-asserting `incident-commander`.
+   - Watch `#hotfix-inc-2041` appear in the room list when an incident opens and flip to *archived* when it closes.
 
 ---
 
@@ -116,6 +129,9 @@ npm test
 ```
 
 Tests verify:
+- External coder routing: verifier seat, rejection of a non-fixing diff (`422`), acceptance of a chat-posted ```` ```diff ```` fence, ephemeral workroom creation/linking/archival.
+- Room-document policy: agent policy edits blocked, human `set max diff 4` rejects promotion, `set approvers sam` rejects Priya with `REJECTED_UNAUTHORIZED_APPROVER`.
+- Commander failover: wedged sentinel evicted with `taken_over`, standby resumes on the same `connection_id` from the last cursor with a new generation and the lease intact.
 - Official Switch v1 YAML Group & Room template schema compliance (`templates/*.yaml`).
 - WebSocket `/agents/{id}/connection/ws` handshake, `connection_state`, 2s `ping`/`pong` cursor liveness, `409` duplicate registration guard, and `taken_over` terminal eviction fencing.
 - Exclusive role lease contention (`409` until `release_role`) and room-scoped document authorship enforcement (`403` on cross-agent overwrite).
