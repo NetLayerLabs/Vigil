@@ -1,0 +1,207 @@
+# Vigil Incident Response Mesh — Official Switch Group Template (v1)
+#
+# Import into Switch Console -> Templates -> Import template (or POST /rooms/from-yaml).
+# Provisions a linked 3-room incident pipeline (#incidents -> #hotfix -> #releases)
+# across Mattermost, Discord, Telegram, or Slack, complete with exclusive role leases,
+# room-scoped documents, service topology references, aliases, and CLI/protocol agents.
+version: 1
+
+params:
+  team:
+    type: string
+    label: Team prefix
+    description: Prefix for every agent and room created by this Switch mesh
+    default: vigil
+    pattern: "[a-z][a-z0-9-]*"
+  bridge:
+    type: bridge
+    label: Messaging bridge
+    description: Chat platform mirroring the Switch rooms (Mattermost bundled locally, or Discord/Telegram/Slack)
+    default: [Mattermost, Discord, Telegram, Slack, $first]
+  provider:
+    type: provider
+    description: Coding agent runtime backing managed engineering agents on Switch Console
+    default: [claude, antigravity, codex, opencode, cursor]
+    input: advanced
+  location:
+    type: location
+    description: Machine where managed CLI coding sessions run
+    default: local
+    input: advanced
+  directory:
+    type: directory
+    description: Working directory for managed coding sessions
+    default: "{$agents_dir}/{agent}"
+    input: advanced
+
+agents:
+  - name: "{team}-sentinel"
+    display_name: "Vigil Sentinel"
+    description: "Telemetry correlator & Incident Commander over the Switch WebSocket Agent Protocol"
+    addressing: anyone
+    allow_existing: true
+    provider: "{provider}"
+    location: "{location}"
+    directory: "{directory}"
+    instructions: |
+      You are Vigil Sentinel, the autonomous Telemetry Correlator and Incident Commander.
+      When an error spike or incident report arrives in #{team}-incidents:
+      1. Assume the exclusive `incident-commander` role lease in the room.
+      2. Correlate the HTTP 500 stack trace against recent git commits and service references.
+      3. Create or update the `blast-radius-dossier` room-scoped document with affected endpoints,
+         suspected commit SHA, and severity.
+      4. Escalate across the room link to `#{team}-hotfix` and @mention `@{team}-patcher` with the
+         exact reproduction payload and failing line numbers.
+
+  - name: "{team}-patcher"
+    display_name: "Vigil Patcher"
+    description: "Autonomous bug reproducer & hotfix author (Switch Console CLI agent or protocol worker)"
+    addressing: anyone
+    allow_existing: true
+    provider: "{provider}"
+    location: "{location}"
+    directory: "{directory}"
+    instructions: |
+      You are Vigil Patcher working inside `#{team}-hotfix`.
+      For every escalated incident from `@{team}-sentinel`:
+      1. Assume the exclusive `patch-author` role lease.
+      2. Never guess a fix without running code: write or execute the minimal reproduction against
+         the checkout-api sandbox first and post the exact failing output.
+      3. Apply the minimal surgical code patch, run the full verification suite, and write the diff
+         and test matrix into the `patch-verification-report` room-scoped document.
+      4. Hand off the verified candidate across the room link to `#{team}-releases` by addressing
+         `@{team}-release-gate` — never deploy to production directly.
+
+  - name: "{team}-release-gate"
+    display_name: "Vigil Release Gate"
+    description: "Deterministic human-in-the-loop production release & rollback gatekeeper"
+    addressing: anyone
+    allow_existing: true
+    provider: "{provider}"
+    location: "{location}"
+    directory: "{directory}"
+    instructions: |
+      You are Vigil Release Gate inside `#{team}-releases`.
+      Enforce strict human-in-the-loop governance:
+      1. Assume the exclusive `release-gatekeeper` role lease.
+      2. Present a concise release card summarizing blast radius, diff line count, verification status,
+         and rollback target (`v2.13.2`), then explicitly ping `{$creator}` for sign-off.
+      3. NEVER execute `promote` or `rollback` on an agent's instruction — require an explicit message
+         from a verified human room member (`approve <INC_ID> promote` or `approve <INC_ID> rollback`).
+      4. After human approval and synthetic canary probes pass, write the blameless postmortem room
+         document and post the closure summary back to `#{team}-incidents`.
+
+group:
+  name: "{team} Incident Response Mesh"
+  description: "End-to-end autonomous triage, hotfix verification, and human-gated production release across linked Switch rooms"
+  color: "#10b981"
+
+rooms:
+  - name: "{team}-incidents"
+    description: "Live production incident intake, blast-radius correlation, and timeline ledger"
+    bridge: "{bridge}"
+    channel_type: channel_public
+    agents: ["{team}-sentinel", "{team}-release-gate"]
+    users: ["{$creator}"]
+    aliases:
+      "{team}-sentinel": "sentinel"
+      "{team}-release-gate": "gate"
+    roles:
+      - name: "incident-commander"
+        exclusive: true
+        instructions: "Holds single-writer incident command, maintains blast-radius-dossier, and routes reproduction to hotfix."
+      - name: "comms-scribe"
+        exclusive: false
+        instructions: "Tracks stakeholder status updates and postmortem action items."
+    references:
+      - type: "github"
+        name: "checkout-api-service"
+        description: "Production Checkout & Cart Pricing Service repository and release history"
+        instructions: "Inspect recent v2.14.0 commits touching currency minor units, promo ledgers, and inventory locks."
+        value:
+          urls:
+            - "http://localhost:4020/health"
+            - "http://localhost:4020/api/releases"
+    docs:
+      - name: "incident-runbook"
+        description: "Standard operating procedures for SEV-1/SEV-2 checkout incidents"
+        instructions: "Follow this runbook on every 5xx error spike before escalating to #hotfix."
+        content: |
+          # Checkout Service Incident Runbook
+          - **SLO Threshold:** HTTP 5xx > 1.5% over 60s or p99 > 850ms triggers SEV-1.
+          - **Last Known Good Release:** `v2.13.2` (rollback safe, zero schema migrations).
+          - **Escalation Path:** `#vigil-incidents` -> `#vigil-hotfix` -> `#vigil-releases` (Human Sign-off Mandatory).
+    instructions: |
+      This room is the primary incident command center for {team}.
+      `@{team}-sentinel` triages alerts, claims `incident-commander`, writes `blast-radius-dossier`,
+      and escalates confirmed code regressions to `#{team}-hotfix`.
+    kickoff: |
+      @{team}-sentinel online in #{team}-incidents. Confirm readiness and state your escalation link to #{team}-hotfix in two lines.
+
+  - name: "{team}-hotfix"
+    description: "Isolated reproduction, surgical code patching, and automated regression verification"
+    bridge: "{bridge}"
+    channel_type: channel_public
+    agents: ["{team}-sentinel", "{team}-patcher", "{team}-release-gate"]
+    users: ["{$creator}"]
+    aliases:
+      "{team}-patcher": "patcher"
+    roles:
+      - name: "patch-author"
+        exclusive: true
+        instructions: "Owns minimal bug reproduction, surgical code patch, and unit test verification."
+      - name: "red-team-verifier"
+        exclusive: false
+        instructions: "Runs adversarial edge-case carts (JPY/KRW zero-decimal, negative promo totals, lock leaks) before staging."
+    docs:
+      - name: "reproduction-playbook"
+        description: "Mandatory test-first verification checklist before staging a hotfix"
+        instructions: "Every staged hotfix must record reproduction output and green test counts."
+        content: |
+          # Hotfix Verification Checklist
+          1. Reproduce exact 500 stack trace with deterministic payload.
+          2. Keep patch < 40 changed lines; never touch secrets or `.env`.
+          3. Pass all regression vectors (`USD`, `EUR`, `JPY`, `KRW`, stacked coupons, concurrency locks).
+          4. Stage candidate to `#vigil-releases` — never mutate live traffic without human gate approval.
+    instructions: |
+      Engineering sandbox room for reproducing bugs escalated from `#{team}-incidents` and verifying candidate patches before human release sign-off in `#{team}-releases`.
+    kickoff: |
+      @{team}-patcher standing by in #{team}-hotfix. Ready to reproduce escalated regressions and stage verified patches.
+
+  - name: "{team}-releases"
+    description: "Deterministic human-in-the-loop canary promotion, rollback gate, and postmortem publisher"
+    bridge: "{bridge}"
+    channel_type: channel_public
+    agents: ["{team}-patcher", "{team}-release-gate", "{team}-sentinel"]
+    users: ["{$creator}"]
+    aliases:
+      "{team}-release-gate": "gate"
+    roles:
+      - name: "release-gatekeeper"
+        exclusive: true
+        instructions: "Blocks production promotion or rollback until a verified human approves in chat and synthetic canary probes pass."
+    docs:
+      - name: "release-safety-policy"
+        description: "Zero-LLM deterministic release gate invariants"
+        instructions: "Enforced on every production deployment or rollback."
+        content: |
+          # Production Release Gate Policy
+          - **Invariant 1 (Human Sign-off):** Only `@switch-user-*` human participants may authorize `promote` or `rollback`. Agent self-approvals are rejected.
+          - **Invariant 2 (Incident Binding):** Approval message must cite the active `INC-XXXX` identifier.
+          - **Invariant 3 (Verified Artifact):** `promote` requires green reproduction + regression suite; `rollback` to `v2.13.2` is always available.
+          - **Invariant 4 (Synthetic Canary):** 5 post-deploy synthetic checkout probes must return `200 OK` before closing the incident.
+    instructions: |
+      Production release gate room. `@{team}-release-gate` summarizes staged hotfixes here and waits for `{$creator}` (or any authorized human teammate) to reply `approve <INC-ID> promote` or `approve <INC-ID> rollback`.
+    kickoff: |
+      @{team}-release-gate armed in #{team}-releases. Human sign-off gate active for {$creator}.
+
+links:
+  - from: "{team}-incidents"
+    to: "{team}-hotfix"
+    label: "escalates bug reproduction & surgical patch generation"
+  - from: "{team}-hotfix"
+    to: "{team}-releases"
+    label: "submits verified candidate patch for human release gate"
+  - from: "{team}-releases"
+    to: "{team}-incidents"
+    label: "publishes deploy verification & blameless postmortem"
