@@ -27,6 +27,8 @@ interface RegisteredAgentRecord {
   participantId: string;
   eventBuffer: SwitchDomainEventFrame[];
   nextSequence: number;
+  /** Who may address this agent (Switch default for a new agent is its owner only). */
+  addressing: 'owner_only' | 'owner_and_owner_agents' | 'anyone';
 }
 
 interface ActiveWsConnection {
@@ -63,6 +65,8 @@ interface InternalRoomState {
   users: Set<string>;
   messages: RoomMessageLogEntry[];
   seq: number;
+  archived: boolean;
+  ephemeral: boolean;
 }
 
 export interface SwitchServerHarnessOptions {
@@ -468,6 +472,7 @@ export class SwitchServerHarness {
         integrationProfile: body.integration_profile,
         apiKey,
         participantId: `@switch-agent-${body.name}:switch.local`,
+        addressing: 'owner_only',
         eventBuffer: [],
         nextSequence: 1,
       };
@@ -649,6 +654,10 @@ export class SwitchServerHarness {
         const room = resolveMemberRoom(args.room_id);
         if (!room) {
           this.sendJson(res, 403, { error: 'Forbidden room' });
+          return;
+        }
+        if (room.archived) {
+          this.sendJson(res, 409, { error: `Room ${room.name} is archived` });
           return;
         }
         if (typeof args.content !== 'string' || !args.content.trim()) {
@@ -837,6 +846,139 @@ export class SwitchServerHarness {
         this.sendJson(res, 200, { result: this.serializeRoomDetail(room).participants });
         return;
       }
+      case 'update_agent_detail': {
+        const addressing = String(args.addressing ?? '');
+        if (addressing === 'owner_only' || addressing === 'owner_and_owner_agents' || addressing === 'anyone') {
+          agent.addressing = addressing;
+        }
+        if (typeof args.description === 'string') agent.description = args.description;
+        if (typeof args.display_name === 'string') agent.displayName = args.display_name;
+        this.notifyChange();
+        this.sendJson(res, 200, {
+          result: { id: agent.id, name: agent.name, addressing: agent.addressing },
+        });
+        return;
+      }
+      case 'create_room': {
+        const name = String(args.name ?? '').trim();
+        if (!/^[a-z0-9][a-z0-9._-]*$/i.test(name)) {
+          this.sendJson(res, 400, { error: 'Room name must match ^[a-z0-9][a-z0-9._-]*$' });
+          return;
+        }
+        if (this.roomsByName.has(name)) {
+          this.sendJson(res, 409, { error: `Room '${name}' already exists` });
+          return;
+        }
+        const id = `room_${name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}`;
+        const agentNames = new Set<string>(
+          Array.isArray(args.agents) ? (args.agents as string[]).map(String) : [],
+        );
+        agentNames.add(agent.name); // creator is always a member
+        const roles: SwitchRole[] = Array.isArray(args.roles)
+          ? (args.roles as Array<Record<string, unknown>>).map((r) => ({
+              name: String(r.name),
+              instructions: String(r.instructions ?? ''),
+              exclusive: Boolean(r.exclusive),
+              holder_agent_id: null,
+              holder_name: null,
+              leased_at: null,
+            }))
+          : [];
+        const documents: SwitchRoomDocument[] = Array.isArray(args.documents)
+          ? (args.documents as Array<Record<string, unknown>>).map((d) => ({
+              name: String(d.name),
+              description: String(d.description ?? ''),
+              instructions: String(d.instructions ?? ''),
+              content: String(d.content ?? ''),
+              created_by_agent_id: agent.id,
+              created_by_name: agent.name,
+              updated_at: Date.now(),
+            }))
+          : [];
+        const room: InternalRoomState = {
+          id,
+          name,
+          description: String(args.description ?? ''),
+          instructions: String(args.instructions ?? ''),
+          bridge: typeof args.bridge === 'string' ? args.bridge : 'Mattermost',
+          channelType: args.channel_type === 'channel_private' ? 'channel_private' : 'channel_public',
+          groupName: null,
+          aliases: {},
+          roles,
+          documents,
+          references: [],
+          agentNames,
+          users: new Set<string>(Array.isArray(args.users) ? (args.users as string[]).map(String) : []),
+          messages: [],
+          seq: 0,
+          archived: false,
+          ephemeral: true,
+        };
+        this.roomsById.set(id, room);
+        this.roomsByName.set(name, room);
+        this.announceRoomToConnections(room, 'room_created');
+        this.notifyChange();
+        this.sendJson(res, 200, { result: this.serializeRoomDetail(room) });
+        return;
+      }
+      case 'invite_agent_to_room': {
+        const room = resolveMemberRoom(args.room_id);
+        if (!room) {
+          this.sendJson(res, 403, { error: 'Forbidden room' });
+          return;
+        }
+        const target = this.agentsByName.get(String(args.agent_name ?? ''));
+        if (!target) {
+          this.sendJson(res, 404, { error: `Unknown agent '${String(args.agent_name)}'` });
+          return;
+        }
+        room.agentNames.add(target.name);
+        this.announceRoomToConnections(room, 'agent_invited');
+        this.notifyChange();
+        this.sendJson(res, 200, { result: { room_id: room.id, agent: target.name, invited: true } });
+        return;
+      }
+      case 'link_rooms': {
+        const fromRoom = resolveMemberRoom(args.from_room_id);
+        const toRoom = this.resolveRoom(String(args.to_room_id ?? ''));
+        if (!fromRoom || !toRoom) {
+          this.sendJson(res, 403, { error: 'Both rooms must exist and the agent must be a member of the source room' });
+          return;
+        }
+        let link = this.links.find((l) => l.from_room_id === fromRoom.id && l.to_room_id === toRoom.id);
+        if (!link) {
+          link = {
+            from_room_id: fromRoom.id,
+            from_room_name: fromRoom.name,
+            to_room_id: toRoom.id,
+            to_room_name: toRoom.name,
+            label: String(args.label ?? 'linked room'),
+          };
+          this.links.push(link);
+        }
+        this.notifyChange();
+        this.sendJson(res, 200, { result: { ...link } });
+        return;
+      }
+      case 'archive_room':
+      case 'unarchive_room': {
+        const room = resolveMemberRoom(args.room_id);
+        if (!room) {
+          this.sendJson(res, 403, { error: 'Forbidden room' });
+          return;
+        }
+        room.archived = operation === 'archive_room';
+        if (room.archived) {
+          for (const role of room.roles) {
+            role.holder_agent_id = null;
+            role.holder_name = null;
+            role.leased_at = null;
+          }
+        }
+        this.notifyChange();
+        this.sendJson(res, 200, { result: this.serializeRoomDetail(room) });
+        return;
+      }
       default: {
         this.sendJson(res, 404, { error: `Unknown operation '${operation}'` });
       }
@@ -958,6 +1100,8 @@ export class SwitchServerHarness {
         users,
         messages: [],
         seq: 0,
+        archived: false,
+        ephemeral: false,
       };
 
       this.roomsById.set(id, roomState);
@@ -1190,7 +1334,28 @@ export class SwitchServerHarness {
       ),
       participants,
       seq: room.seq,
+      archived: room.archived,
+      ephemeral: room.ephemeral,
     };
+  }
+
+  /** Add a freshly created room to every open `scope=all` connection of its member agents. */
+  private announceRoomToConnections(room: InternalRoomState, reason: string): void {
+    for (const conn of this.connections.values()) {
+      const agent = this.agentsById.get(conn.agentId);
+      if (agent && conn.scope === 'all' && room.agentNames.has(agent.name) && !conn.rooms.has(room.id)) {
+        conn.rooms.add(room.id);
+        if (conn.ws.readyState === WebSocket.OPEN) {
+          conn.ws.send(
+            JSON.stringify({
+              type: 'subscription_changed',
+              rooms: Array.from(conn.rooms).sort(),
+              reason,
+            }),
+          );
+        }
+      }
+    }
   }
 
   private resolveRoom(idOrName: string): InternalRoomState | undefined {
@@ -1248,6 +1413,12 @@ export class SwitchServerHarness {
       assume_role: { description: 'Acquire lease on a room role', input_schema: roomScoped },
       release_role: { description: 'Release lease on a room role', input_schema: roomScoped },
       create_room_document: { description: 'Create a room-scoped document', input_schema: roomScoped },
+      create_room: { description: 'Create a room (ephemeral workrooms, etc.)', input_schema: { type: 'object', required: ['name'] } },
+      link_rooms: { description: 'Create a directed link between two rooms', input_schema: { type: 'object', required: ['from_room_id', 'to_room_id'] } },
+      archive_room: { description: 'Archive a room (reversible metadata change)', input_schema: roomScoped },
+      unarchive_room: { description: 'Restore an archived room', input_schema: roomScoped },
+      invite_agent_to_room: { description: 'Add an agent to a room', input_schema: roomScoped },
+      update_agent_detail: { description: 'Update agent addressing / profile', input_schema: { type: 'object', required: ['agent_id'] } },
       update_room_document: { description: 'Update an agent-authored room document', input_schema: roomScoped },
       load_internal_documents: { description: 'Load all room-scoped documents', input_schema: roomScoped },
       list_linked_rooms: { description: 'List directed links attached to this room', input_schema: roomScoped },
