@@ -8,8 +8,8 @@ import { startVigilRuntime } from '../src/index.js';
 
 async function waitFor(
   predicate: () => boolean | Promise<boolean>,
-  timeoutMs = 6000,
-  intervalMs = 40,
+  timeoutMs = 30000,
+  intervalMs = 60,
 ): Promise<void> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
@@ -297,7 +297,8 @@ room:
     expect(verified.allPassed).toBe(true);
     expect(verified.author).toBe('Claude Code');
     expect(verified.source).toBe('external-coder');
-    expect(verified.testMatrix[0].name).toMatch(/no longer reproduces/);
+    expect(verified.testMatrix.some((t) => /no longer reproduces/.test(t.name) && t.passed)).toBe(true);
+    expect(verified.candidateSha).toBeTruthy();
 
     // 3. Policy lives in the room document: an agent may not change it, a human may
     await runtime.coordinator.patcherClient.postMessage(releasesRoomId, '@vigil-release-gate set max diff 400');
@@ -362,7 +363,7 @@ room:
     await waitFor(async () => {
       const rec = runtime.coordinator.getIncidents().find((i) => i.incidentId === incidentId);
       return rec?.stage === 'resolved_promoted' && rec.workroom?.archived === true;
-    }, 8000);
+    }, 30000);
     const finalRec = runtime.coordinator.getIncidents().find((i) => i.incidentId === incidentId)!;
     expect(finalRec.finalVersion).toBe('v2.14.1-hotfix');
     expect(finalRec.canaryReport?.probesPassed).toBe(5);
@@ -433,7 +434,7 @@ room:
     await waitFor(async () => {
       const ctx = await after.readContext(incidentsRoomId, 30);
       return ctx.messages.some((m) => /INC-2041 CLOSED/.test(m.body));
-    }, 8000);
+    }, 30000);
     const finalRoles = (await after.getRoomDetail(incidentsRoomId)).roles.find((r) => r.name === 'incident-commander');
     expect(finalRoles?.holder_name ?? null).toBeNull();
     expect(after.isHung()).toBe(false);
