@@ -231,6 +231,10 @@ export interface SwitchRoomDetail {
   links: SwitchRoomLink[];
   participants: SwitchParticipant[];
   seq: number;
+  /** Lifecycle flag: archived rooms keep their log but accept no new work (`archive_room`). */
+  archived?: boolean;
+  /** Set on rooms an agent created at runtime (e.g. per-incident workrooms) rather than from a template. */
+  ephemeral?: boolean;
 }
 
 export interface ProtocolWireTrace {
