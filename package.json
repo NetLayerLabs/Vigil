@@ -1,0 +1,41 @@
+{
+  "name": "vigil-switch",
+  "version": "1.0.0",
+  "description": "Vigil — Autonomous Incident-to-Hotfix War Room built on Switch Rooms & the Switch WebSocket Agent Protocol",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "start": "node dist/server/index.js",
+    "build": "npm run build:server && npm run build:ui",
+    "build:server": "tsc -p tsconfig.server.json",
+    "build:ui": "vite build",
+    "ui:dev": "vite",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "onboard:switch": "tsx scripts/onboard-switch-agents.ts",
+    "inject:fault": "tsx scripts/inject-fault.ts"
+  },
+  "dependencies": {
+    "lucide-react": "^0.468.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "ws": "^8.18.0",
+    "yaml": "^2.6.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@types/ws": "^8.5.13",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.17",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.5",
+    "vitest": "^2.1.8"
+  }
+}
