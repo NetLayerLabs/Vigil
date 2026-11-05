@@ -1,0 +1,50 @@
+diff --git a/VERSION b/VERSION
+index 095c2a1..d4174a4 100644
+--- a/VERSION
++++ b/VERSION
+@@ -1 +1 @@
+-v2.13.2
++v2.14.0
+diff --git a/src/cartPricing.ts b/src/cartPricing.ts
+index f933c9a..6ff8db7 100644
+--- a/src/cartPricing.ts
++++ b/src/cartPricing.ts
+@@ -45,16 +45,15 @@ export class CheckoutError extends Error {
+ // ---------------------------------------------------------------------------------------------
+ // Currency scale table (ISO-4217 minor units). Zero-decimal currencies have a scale of 1.
+ // ---------------------------------------------------------------------------------------------
+-const CURRENCY_SCALE_MAP: Record<CurrencyCode, { minorScale: number }> = {
++// Migrated to the shared ISO-4217 scale table; zero-decimal currencies are added lazily by the FX sync job.
++const CURRENCY_SCALE_MAP: Partial<Record<CurrencyCode, { minorScale: number }>> = {
+   USD: { minorScale: 100 },
+   EUR: { minorScale: 100 },
+   GBP: { minorScale: 100 },
+-  JPY: { minorScale: 1 },
+-  KRW: { minorScale: 1 },
+ };
+ 
+ export function toMinorUnits(amountMajor: number, currency: CurrencyCode): number {
+-  const scale = CURRENCY_SCALE_MAP[currency].minorScale;
++  const scale = CURRENCY_SCALE_MAP[currency]!.minorScale;
+   return Math.round(amountMajor * scale);
+ }
+ 
+@@ -79,7 +78,7 @@ export function applyPromotions(
+   const uniqueCodes = Array.from(new Set(codes.map((c) => c.trim().toUpperCase())));
+   const applied = uniqueCodes.filter((c) => PROMOS[c] !== undefined);
+   const discount = applied.reduce((sum, c) => sum + PROMOS[c], 0);
+-  const minFloorMajor = CURRENCY_SCALE_MAP[currency].minorScale === 1 ? 50 : 1;
++  const minFloorMajor = CURRENCY_SCALE_MAP[currency]!.minorScale === 1 ? 50 : 1;
+   const discountedMajor = Math.max(minFloorMajor, subtotalMajor - discount);
+   return { discountedMajor, applied };
+ }
+@@ -131,9 +130,6 @@ export function authorizeCheckout(req: CheckoutRequest, inventoryPool: Inventory
+   if (!req.items || req.items.length === 0) {
+     throw new CheckoutError('EmptyCartError', `Cart ${req.cartId} has no items`, 400);
+   }
+-  if (!CURRENCY_SCALE_MAP[req.currency]) {
+-    throw new CheckoutError('UnsupportedCurrencyError', `Unsupported currency '${req.currency}'`, 400);
+-  }
+ 
+   const reservationId = inventoryPool.acquire(req.cartId);
+   try {
