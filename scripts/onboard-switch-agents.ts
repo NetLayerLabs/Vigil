@@ -79,15 +79,32 @@ async function main() {
     upsertEnv(`${s.envPrefix}_AGENT_ID`, reg.id);
     upsertEnv(`${s.envPrefix}_API_KEY`, reg.api_key);
     console.log(`  ✓ ${s.name} -> id=${reg.id}`);
+
+    // A newly registered Switch agent answers only its owner. Vigil needs agent-to-agent handoffs
+    // (sentinel -> patcher -> release gate) and approvals from any human teammate in the room.
+    const client = new SwitchAgentClient({
+      baseUrl: switchUrl,
+      agentId: reg.id,
+      agentName: s.name,
+      apiKey: reg.api_key,
+    });
+    try {
+      await client.updateAddressing('anyone');
+      console.log(`    addressing -> anyone`);
+    } catch (err) {
+      console.warn(`    ! could not widen addressing for ${s.name}: ${(err as Error).message}`);
+      console.warn(`      Set it in Switch Console -> agent settings -> "Choose who can instruct the agent".`);
+    }
   }
 
   writeFileSync(envPath, envContent, 'utf8');
   console.log('\nSaved registered Switch Agent credentials to .env!');
   console.log('Next step:');
   console.log('  1. In Switch Console -> Templates -> Import template: upload templates/vigil-war-room.template.yaml');
-  console.log('     (Select "Existing agent" on the 3 agent cards to attach these registered WebSocket agents, or swap');
-  console.log('      vigil-patcher to Claude Code / Antigravity!)');
-  console.log('  2. Start Vigil connected to your live Switch Server: npm run dev');
+  console.log('     (Select "Existing agent" on the 3 agent cards to attach these registered WebSocket agents.)');
+  console.log('  2. Optional: bind your local Claude Code / Codex session into #vigil-hotfix via Switch Console and set');
+  console.log('     SWITCH_CONSOLE_CODER_HANDLE=<its agent name> so vigil-patcher becomes the verifier (CLAUDE.md briefs it).');
+  console.log('  3. Start Vigil connected to your live Switch Server: npm run dev');
 }
 
 main().catch((err) => {
