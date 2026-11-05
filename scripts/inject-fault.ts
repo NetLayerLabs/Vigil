@@ -1,4 +1,4 @@
-import { FaultScenarioId } from '../src/services/checkoutSandbox.js';
+import { FaultScenarioId } from '../src/services/checkoutTarget.js';
 
 const scenario = (process.argv[2] ?? 'jpy_zero_decimal_500') as FaultScenarioId;
 const vigilUrl = process.env.VIGIL_URL ?? 'http://localhost:4010';
