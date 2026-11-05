@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "switch-docs": {
+      "type": "http",
+      "url": "https://docs.switchagents.ai/mcp"
+    }
+  }
+}
