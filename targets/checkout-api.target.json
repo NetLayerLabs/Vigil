@@ -1,0 +1,30 @@
+{
+  "$comment": "Field reference: targets/README.md",
+  "name": "checkout-api",
+  "description": "Vigil's demo checkout service: cart pricing in several currencies, promo codes and inventory locks.",
+  "source": { "path": "services/checkout-api" },
+  "versions": { "lastKnownGood": "v2.13.2", "hotfix": "v2.14.1-hotfix" },
+  "codePaths": ["src", "test"],
+  "start": ["node", "--import", "tsx", "src/server.ts"],
+  "test": ["node", "--import", "tsx", "--test", "--test-reporter=tap", "test/cartPricing.test.ts"],
+  "portEnv": ["PORT", "CHECKOUT_API_PORT"],
+  "healthPath": "/health",
+  "metricsPath": "/metrics",
+  "endpoint": { "method": "POST", "path": "/api/checkout" },
+  "traffic": [
+    { "cartId": "traffic_usd", "currency": "USD", "items": [{ "sku": "PRO", "qty": 1, "unitPriceMajor": 99 }] },
+    { "cartId": "traffic_eur", "currency": "EUR", "items": [{ "sku": "PRO", "qty": 1, "unitPriceMajor": 89 }] },
+    { "cartId": "traffic_jpy", "currency": "JPY", "items": [{ "sku": "PRO", "qty": 2, "unitPriceMajor": 4800 }] },
+    { "cartId": "traffic_gbp", "currency": "GBP", "items": [{ "sku": "TEAM", "qty": 3, "unitPriceMajor": 45 }] },
+    { "cartId": "traffic_promo", "currency": "USD", "items": [{ "sku": "STARTER", "qty": 1, "unitPriceMajor": 29 }], "promoCodes": ["SAVE15"] },
+    { "cartId": "traffic_krw", "currency": "KRW", "items": [{ "sku": "PRO", "qty": 1, "unitPriceMajor": 55000 }] }
+  ],
+  "canaries": [
+    { "name": "USD", "body": { "cartId": "canary_usd", "currency": "USD", "items": [{ "sku": "PRO", "qty": 1, "unitPriceMajor": 99 }] } },
+    { "name": "EUR", "body": { "cartId": "canary_eur", "currency": "EUR", "items": [{ "sku": "PRO", "qty": 1, "unitPriceMajor": 89 }] } },
+    { "name": "JPY", "body": { "cartId": "canary_jpy", "currency": "JPY", "items": [{ "sku": "PRO", "qty": 2, "unitPriceMajor": 4800 }] } },
+    { "name": "KRW", "body": { "cartId": "canary_krw", "currency": "KRW", "items": [{ "sku": "PRO", "qty": 1, "unitPriceMajor": 55000 }] } },
+    { "name": "USD promo", "body": { "cartId": "canary_promo", "currency": "USD", "items": [{ "sku": "STARTER", "qty": 1, "unitPriceMajor": 29 }], "promoCodes": ["VIP40", "SAVE15", "VIP40"] } }
+  ],
+  "faults": "builtin-checkout"
+}
