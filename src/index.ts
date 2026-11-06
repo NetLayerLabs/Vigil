@@ -59,7 +59,7 @@ export async function startVigilRuntime(opts: {
   });
   const boundCheckoutPort = await checkoutService.start(checkoutPort);
 
-  // 2. Start Embedded Spec-Exact Switch Protocol Server OR attach to live Switch Console Server!
+  // 2. Start the embedded Switch protocol server, or attach to a real Switch server
   let embeddedSwitch: SwitchServerHarness | null = null;
   let switchServerUrl = externalSwitchUrl;
 
@@ -200,7 +200,7 @@ export async function startVigilRuntime(opts: {
             id: coordinator.sentinelClient.agentId,
             name: coordinator.sentinelClient.agentName,
             displayName: 'Vigil Sentinel',
-            description: 'Telemetry Correlator & Incident Commander',
+            description: 'Watches checkout-api, opens incidents and leads them',
             participantId: `@switch-agent-${coordinator.sentinelClient.agentName}`,
             online: !coordinator.sentinelClient.isStoppedPermanently(),
             cursor: coordinator.sentinelClient.getCursor(),
@@ -210,7 +210,7 @@ export async function startVigilRuntime(opts: {
             id: coordinator.patcherClient.agentId,
             name: coordinator.patcherClient.agentName,
             displayName: 'Vigil Patcher',
-            description: 'Surgical Bug Reproducer & Regression Patcher',
+            description: 'Reproduces the bug, fixes or checks the fix, runs the tests',
             participantId: `@switch-agent-${coordinator.patcherClient.agentName}`,
             online: !coordinator.patcherClient.isStoppedPermanently(),
             cursor: coordinator.patcherClient.getCursor(),
@@ -220,7 +220,7 @@ export async function startVigilRuntime(opts: {
             id: coordinator.releaseGateClient.agentId,
             name: coordinator.releaseGateClient.agentName,
             displayName: 'Vigil Release Gate',
-            description: 'Deterministic Human Release Gatekeeper',
+            description: 'Ships or rolls back only when a person approves',
             participantId: `@switch-agent-${coordinator.releaseGateClient.agentName}`,
             online: !coordinator.releaseGateClient.isStoppedPermanently(),
             cursor: coordinator.releaseGateClient.getCursor(),
@@ -678,7 +678,7 @@ if (isDirectEntry) {
   startVigilRuntime()
     .then((runtime) => {
       console.log('====================================================================');
-      console.log('⚡ Vigil — Autonomous Incident-to-Hotfix War Room on Switch');
+      console.log('Vigil: incident response on Switch');
       console.log('====================================================================');
       console.log(`• Observatory & API   : ${runtime.vigilUrl}`);
       console.log(`• Checkout API Target : ${runtime.checkoutUrl}/health (real process, git working copy: ${runtime.checkoutService.getWorkDir()})`);

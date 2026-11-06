@@ -26,19 +26,19 @@ async function main() {
       envPrefix: 'VIGIL_SENTINEL',
       name: `${team}-sentinel`,
       displayName: 'Vigil Sentinel',
-      description: 'Autonomous Telemetry Correlator & Incident Commander',
+      description: 'Watches checkout-api, opens incidents and leads them',
     },
     {
       envPrefix: 'VIGIL_PATCHER',
       name: `${team}-patcher`,
       displayName: 'Vigil Patcher',
-      description: 'Surgical Bug Reproducer & Regression Patcher',
+      description: 'Reproduces the bug, fixes or checks the fix, runs the tests',
     },
     {
       envPrefix: 'VIGIL_RELEASE_GATE',
       name: `${team}-release-gate`,
       displayName: 'Vigil Release Gate',
-      description: 'Deterministic Human-in-the-Loop Release & Rollback Gatekeeper',
+      description: 'Ships or rolls back only when a person approves',
     },
   ];
 

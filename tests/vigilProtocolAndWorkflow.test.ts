@@ -253,7 +253,7 @@ room:
     const { hotfixRoomId, releasesRoomId } = runtime.coordinator.getRoomIds();
     await waitFor(async () => {
       const ctx = await runtime.coordinator.patcherClient.readContext(hotfixRoomId, 20);
-      return ctx.messages.some((m) => /VERIFIER ARMED/.test(m.body));
+      return ctx.messages.some((m) => /waiting for @/.test(m.body));
     });
     expect(runtime.coordinator.getActiveIncident()?.patchVerification).toBeNull();
     const hotfixDetail = await runtime.coordinator.patcherClient.getRoomDetail(hotfixRoomId);
@@ -435,7 +435,7 @@ room:
     });
     await waitFor(async () => {
       const ctx = await after.readContext(incidentsRoomId, 30);
-      return ctx.messages.some((m) => /INC-2041 CLOSED/.test(m.body));
+      return ctx.messages.some((m) => /INC-2041 closed/.test(m.body));
     }, 30000);
     const finalRoles = (await after.getRoomDetail(incidentsRoomId)).roles.find((r) => r.name === 'incident-commander');
     expect(finalRoles?.holder_name ?? null).toBeNull();
