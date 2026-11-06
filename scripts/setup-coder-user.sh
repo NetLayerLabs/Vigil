@@ -58,8 +58,9 @@ if id "$CODER_USER" >/dev/null 2>&1; then
     need_free_id "$CODER_UID" "$CODER_USER"
     # usermod refuses while any process runs as the old uid, and containers that share that number
     # count, so edit the entries directly. Only this user's own files are re-owned below.
-    groupmod -g "$CODER_UID" "$CODER_USER"
-    sed -i "s/^$CODER_USER:x:$old_uid:$old_gid:/$CODER_USER:x:$CODER_UID:$CODER_UID:/" /etc/passwd
+    # groupmod also rewrites the user's group field in /etc/passwd, so match the line by name only.
+    [ "$(getent group "$CODER_USER" | cut -d: -f3)" = "$CODER_UID" ] || groupmod -g "$CODER_UID" "$CODER_USER"
+    sed -i "s/^$CODER_USER:x:[0-9]*:[0-9]*:/$CODER_USER:x:$CODER_UID:$CODER_UID:/" /etc/passwd
     [ "$(id -u "$CODER_USER")" = "$CODER_UID" ] || { echo "Could not change $CODER_USER's uid." >&2; exit 1; }
     chown -R -h "$CODER_UID:$CODER_UID" "$(getent passwd "$CODER_USER" | cut -d: -f6)"
     echo "Moved user $CODER_USER from uid $old_uid/gid $old_gid to $CODER_UID/$CODER_UID."
