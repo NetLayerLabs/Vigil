@@ -575,12 +575,6 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
             <span />
             <span />
           </button>
-          {onHome && (
-            <button type="button" className="wr-btn wr-btn--dark wr-desk" onClick={onHome} title="Back to the landing page">
-              <ArrowLeft className="wr-ic" />
-              <span>Home</span>
-            </button>
-          )}
         </div>
       </header>
 
