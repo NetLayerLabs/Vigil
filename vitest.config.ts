@@ -7,7 +7,7 @@ export default defineConfig({
     exclude: ['services/**', 'node_modules/**', 'dist/**', '.vigil-state/**'],
     testTimeout: 90_000,
     hookTimeout: 30_000,
-    // End-to-end suites spawn real service processes on fixed ports; run them one at a time.
+    // End-to-end suites spawn real service processes (on ephemeral ports); run the files one at a time.
     fileParallelism: false,
   },
 });
