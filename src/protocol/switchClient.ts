@@ -149,7 +149,12 @@ export class SwitchAgentClient {
     return this.hung;
   }
 
-  /** True once the server has identified itself as a real Switch server (switch-core). */
+  /** True while the WebSocket is open and the client is answering (not wedged, not evicted). */
+  public isConnected(): boolean {
+    return !this.hung && !this.stoppedPermanently && this.ws !== null && this.ws.readyState === WebSocket.OPEN;
+  }
+
+    /** True once the server has identified itself as a real Switch server (switch-core). */
   public isSwitchCore(): boolean {
     return this.dialect === 'switch-core';
   }
@@ -450,6 +455,7 @@ export class SwitchAgentClient {
     if (frame.event === 'message') {
       const msgData = frame.data as SwitchDomainEventFrame<'message'>['data'];
       const payload = msgData.payload as SwitchMessagePayload;
+      if (payload.sender_kind == null) payload.sender_kind = senderKindFromId(payload.sender);
       this.emitTrace(
         'inbound',
         'message',
@@ -608,7 +614,7 @@ export class SwitchAgentClient {
             addressed: false,
             sender: m.sender,
             sender_name: m.sender_name,
-            sender_kind: m.sender_kind ?? null,
+            sender_kind: m.sender_kind ?? senderKindFromId(m.sender),
             message_id: m.id,
             body: m.body,
             timestamp: m.timestamp,
@@ -863,4 +869,16 @@ export class SwitchAgentClient {
       payload,
     });
   }
+}
+
+/**
+ * A real Switch server labels only some messages with sender_kind. The participant id still says who
+ * spoke: agents are `@switch-agent-*`, people are `@switch-user-*` or on a chat bridge
+ * (`@switch-<app>-<bridge>-<handle>`). Anything else stays unknown, and the gate treats unknown as not a person.
+ */
+export function senderKindFromId(id: string | undefined | null): 'agent' | 'user' | null {
+  const lower = (id ?? '').toLowerCase();
+  if (lower.startsWith('@switch-agent-')) return 'agent';
+  if (/^@switch-(?:user-|admin:|(?:mattermost|slack|discord|telegram|teams)-)/.test(lower)) return 'user';
+  return null;
 }

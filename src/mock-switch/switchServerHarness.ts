@@ -1155,15 +1155,9 @@ export class SwitchServerHarness {
       }
     }
 
-    // Post kickoffs on behalf of the human deployer
+    // Post kickoffs as Switch itself, as a real Switch server does (no person typed them)
     for (const k of pendingKickoffs) {
-      this.commitMessageToRoom(
-        k.room,
-        `@switch-user-${creatorUsername}:switch.local`,
-        creatorUsername,
-        k.text,
-        null,
-      );
+      this.commitMessageToRoom(k.room, '@switch-platform:switch.local', 'Switch', k.text, null, 'platform');
     }
 
     return {
@@ -1179,7 +1173,10 @@ export class SwitchServerHarness {
     senderName: string,
     content: string,
     threadId: string | null,
+    /** Who the server says sent it, as a real Switch server labels messages: user, agent or platform. */
+    senderKind?: 'user' | 'agent' | 'platform',
   ): { seq: number; message_id: string } {
+    const kind = senderKind ?? (senderParticipantId.startsWith('@switch-agent-') ? 'agent' : 'user');
     room.seq += 1;
     const seq = room.seq;
     const messageId = `msg_${room.id}_${seq}_${randomUUID().slice(0, 6)}`;
@@ -1189,6 +1186,7 @@ export class SwitchServerHarness {
       addressed: false,
       sender: senderParticipantId,
       sender_name: senderName,
+      sender_kind: kind,
       message_id: messageId,
       body: content,
       timestamp,
@@ -1227,6 +1225,7 @@ export class SwitchServerHarness {
             addressed,
             sender: senderParticipantId,
             sender_name: senderName,
+            sender_kind: kind,
             message_id: messageId,
             body: content,
             timestamp,
