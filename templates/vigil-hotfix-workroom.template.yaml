@@ -12,11 +12,11 @@ params:
   patcher_agent:
     type: agent
     label: Patcher agent
-    description: Coding agent that reproduces the fault and writes the surgical patch
+    description: Coding agent that reproduces the fault and writes the fix
   gate_agent:
     type: agent
     label: Release gate agent
-    description: Gatekeeper agent that verifies tests and enforces human approval
+    description: Agent that checks the tests and waits for a person to approve
   bridge:
     type: bridge
     default: [Mattermost, Discord, Telegram, Slack, $first]
@@ -28,7 +28,7 @@ params:
 
 room:
   name: "hotfix-{incident_id}"
-  description: "Dedicated hotfix workroom for {incident_id} with deterministic human release gate"
+  description: "Working room for {incident_id}: reproduce, fix, verify"
   bridge: "{bridge}"
   channel_type: channel_private
   agents: ["{patcher_agent}", "{gate_agent}"]

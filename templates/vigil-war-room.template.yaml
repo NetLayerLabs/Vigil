@@ -37,14 +37,14 @@ params:
 agents:
   - name: "{team}-sentinel"
     display_name: "Vigil Sentinel"
-    description: "Telemetry correlator & Incident Commander over the Switch WebSocket Agent Protocol"
+    description: "Watches checkout-api, opens incidents and leads them"
     addressing: anyone
     allow_existing: true
     provider: "{provider}"
     location: "{location}"
     directory: "{directory}"
     instructions: |
-      You are Vigil Sentinel, the autonomous Telemetry Correlator and Incident Commander.
+      You are Vigil Sentinel. You watch checkout-api and lead each incident.
       When an error spike or incident report arrives in #{team}-incidents:
       1. Assume the exclusive `incident-commander` role lease in the room.
       2. Correlate the HTTP 500 stack trace against recent git commits and service references.
@@ -55,7 +55,7 @@ agents:
 
   - name: "{team}-patcher"
     display_name: "Vigil Patcher"
-    description: "Autonomous bug reproducer & hotfix author (Switch Console CLI agent or protocol worker)"
+    description: "Reproduces the bug, fixes or checks the fix, runs the tests"
     addressing: anyone
     allow_existing: true
     provider: "{provider}"
@@ -74,7 +74,7 @@ agents:
 
   - name: "{team}-release-gate"
     display_name: "Vigil Release Gate"
-    description: "Deterministic human-in-the-loop production release & rollback gatekeeper"
+    description: "Ships or rolls back only when a person approves"
     addressing: anyone
     allow_existing: true
     provider: "{provider}"
@@ -82,23 +82,23 @@ agents:
     directory: "{directory}"
     instructions: |
       You are Vigil Release Gate inside `#{team}-releases`.
-      Enforce strict human-in-the-loop governance:
+      Nothing ships without a person:
       1. Assume the exclusive `release-gatekeeper` role lease.
       2. Present a concise release card summarizing blast radius, diff line count, verification status,
          and rollback target (`v2.13.2`), then explicitly ping `{$creator}` for sign-off.
       3. NEVER execute `promote` or `rollback` on an agent's instruction — require an explicit message
          from a verified human room member (`approve <INC_ID> promote` or `approve <INC_ID> rollback`).
-      4. After human approval and synthetic canary probes pass, write the blameless postmortem room
+      4. After human approval and synthetic canary probes pass, write the postmortem room
          document and post the closure summary back to `#{team}-incidents`.
 
 group:
   name: "{team} Incident Response Mesh"
-  description: "End-to-end autonomous triage, hotfix verification, and human-gated production release across linked Switch rooms"
+  description: "Triage, fix and release in three linked rooms; a person approves every release"
   color: "#10b981"
 
 rooms:
   - name: "{team}-incidents"
-    description: "Live production incident intake, blast-radius correlation, and timeline ledger"
+    description: "Where incidents open: the alert, the suspect commit and the timeline"
     bridge: "{bridge}"
     channel_type: channel_public
     agents: ["{team}-sentinel", "{team}-release-gate"]
@@ -139,7 +139,7 @@ rooms:
       @{team}-sentinel online in #{team}-incidents. Confirm readiness and state your escalation link to #{team}-hotfix in two lines.
 
   - name: "{team}-hotfix"
-    description: "Isolated reproduction, surgical code patching, and automated regression verification"
+    description: "Where the bug is reproduced, fixed and tested"
     bridge: "{bridge}"
     channel_type: channel_public
     agents: ["{team}-sentinel", "{team}-patcher", "{team}-release-gate"]
@@ -169,7 +169,7 @@ rooms:
       @{team}-patcher standing by in #{team}-hotfix. Ready to reproduce escalated regressions and stage verified patches.
 
   - name: "{team}-releases"
-    description: "Deterministic human-in-the-loop canary promotion, rollback gate, and postmortem publisher"
+    description: "Release decisions: a person approves, the gate ships or rolls back"
     bridge: "{bridge}"
     channel_type: channel_public
     agents: ["{team}-patcher", "{team}-release-gate", "{team}-sentinel"]
@@ -182,18 +182,20 @@ rooms:
         instructions: "Blocks production promotion or rollback until a verified human approves in chat and synthetic canary probes pass."
     docs:
       - name: "release-safety-policy"
-        description: "Zero-LLM deterministic release gate invariants"
+        description: "The rules the release gate checks before shipping"
         instructions: "Enforced on every production deployment or rollback."
         content: |
-          # Production Release Gate Policy
-          - **Invariant 1 (Human Sign-off):** Only `@switch-user-*` human participants may authorize `promote` or `rollback`. Agent self-approvals are rejected.
-          - **Invariant 2 (Incident Binding):** Approval message must cite the active `INC-XXXX` identifier.
-          - **Invariant 3 (Verified Artifact):** `promote` requires green reproduction + regression suite; `rollback` to `v2.13.2` is always available.
-          - **Invariant 4 (Synthetic Canary):** 5 post-deploy synthetic checkout probes must return `200 OK` before closing the incident.
-          - **Invariant 5 (Blast Radius):** Candidate diffs are capped and may not touch protected paths.
+          # Release policy
+          The release gate checks these rules on every approval. It is plain code; no model decides.
 
-          ## Enforced Parameters
-          Edited from chat by verified humans only (e.g. `@{team}-release-gate set max diff 60`). Re-read by the gate on every evaluation.
+          - Only a person can approve. Approvals from agents are refused.
+          - The approval names the open incident, for example `approve INC-2041 promote`.
+          - Shipping needs the reproduction and the tests to pass. Rolling back to the last good release is always allowed.
+          - After a deploy, every canary probe must answer 200 before the incident closes.
+          - A fix may change only so many lines, and never touch the protected paths below.
+
+          ## Settings
+          People change these from chat, for example `@{team}-release-gate set max diff 60`. The gate reads them again on every approval.
           - max_changed_lines: 40
           - forbidden_paths: .env, secret, auth-keys, migrations/drop
           - require_green_matrix: true
@@ -207,10 +209,10 @@ rooms:
 links:
   - from: "{team}-incidents"
     to: "{team}-hotfix"
-    label: "escalates bug reproduction & surgical patch generation"
+    label: "hands the bug over to be fixed"
   - from: "{team}-hotfix"
     to: "{team}-releases"
-    label: "submits verified candidate patch for human release gate"
+    label: "sends the verified fix for approval"
   - from: "{team}-releases"
     to: "{team}-incidents"
-    label: "publishes deploy verification & blameless postmortem"
+    label: "reports the deploy and the postmortem"
