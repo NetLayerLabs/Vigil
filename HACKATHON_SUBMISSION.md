@@ -10,7 +10,7 @@
 ## Links
 - **Live app:** https://vigil.netlayerlabs.com (War Room at `/app`), running against a real Switch server (switch-core 0.31.0)
 - **Switch server:** https://vigil-switch.netlayerlabs.com · **Mattermost:** https://vigil-chat.netlayerlabs.com
-- **Code:** https://github.com/mrnetwork0001/Vigil
+- **Code:** https://github.com/NetLayerLabs/Vigil
 
 ## Tagline (One Line)
 Turn SEV-1 production outages into an auditable, multi-room team workflow in Mattermost, Discord, Telegram, or Slack — combining Switch WebSocket protocol agents, CLI coding agents, exclusive role leases, room documents, and a deterministic human release gate.
@@ -48,4 +48,4 @@ Turn SEV-1 production outages into an auditable, multi-room team workflow in Mat
 >
 > Built over Switch's WebSocket Agent Protocol + v1 YAML Group Templates.
 >
-> Repo & demo: https://github.com/mrnetwork0001/Vigil #HowISwitch
+> Repo & demo: https://github.com/NetLayerLabs/Vigil #HowISwitch

@@ -25,7 +25,7 @@ Nothing ships without a human. The gate deterministically rejects agent self-app
 
 **8/**
 Clone, npm test, npm start, click Open the War Room. Built for @WeMakeDevs_ and @<switch-handle> Track 01.
-https://github.com/mrnetwork0001/Vigil #HowISwitch
+https://github.com/NetLayerLabs/Vigil #HowISwitch
 
 ## B. LinkedIn post
 

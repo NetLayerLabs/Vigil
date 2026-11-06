@@ -4,7 +4,7 @@
 
 When a release breaks checkout, `@vigil-sentinel` takes command in `#vigil-incidents`, a patcher (Vigil's own, or your Claude Code session) writes the fix in `#vigil-hotfix`, and `@vigil-release-gate` waits in `#vigil-releases` until a teammate types `approve INC-2041 promote` in Mattermost, Discord, Telegram or Slack. Everything is measured by one rule: **no change reaches production unless the real test suite is green, the failing request now succeeds on staging, and a human said yes.**
 
-Built for the [Flip the Switch Hackathon](https://www.wemakedevs.org/hackathons/switch) (WeMakeDevs x Switch, Track 01: Best Business Workflow) · Live: [vigil.netlayerlabs.com](https://vigil.netlayerlabs.com), on a real Switch server · Local: [Run it](#run-it-locally) · Demo: `<VIDEO_URL>` · Code: [github.com/mrnetwork0001/Vigil](https://github.com/mrnetwork0001/Vigil)
+Built for the [Flip the Switch Hackathon](https://www.wemakedevs.org/hackathons/switch) (WeMakeDevs x Switch, Track 01: Best Business Workflow) · Live: [vigil.netlayerlabs.com](https://vigil.netlayerlabs.com), on a real Switch server · Local: [Run it](#run-it-locally) · Demo: `<VIDEO_URL>` · Code: [github.com/NetLayerLabs/Vigil](https://github.com/NetLayerLabs/Vigil)
 
 **Judges, start here:** `npm install && npm run build && npm start`, open [localhost:4010](http://localhost:4010) and press **Open the War Room**. No accounts, keys or Docker are needed: Vigil boots its own Switch protocol server and a real checkout service. Click **01 JPY Zero-Decimal 500**, wait about 5 seconds for the dark sign-off bar, then click **Approve & Promote as Priya**. The whole incident takes under a minute.
 
@@ -313,7 +313,7 @@ Node.js 26.5 (the version tested) · TypeScript 5.9 · `ws` 8.22 for WebSockets 
 **Prerequisites:** Node.js (tested on 26.5; the service runs with `node --import tsx`, which needs 20.6 or newer), npm, and git on your `PATH`. Ports `4010` and `4020` free, or set your own.
 
 ```bash
-git clone https://github.com/mrnetwork0001/Vigil.git
+git clone https://github.com/NetLayerLabs/Vigil.git
 cd Vigil
 npm install
 npm test           # 7 integration tests, about 6 seconds

@@ -3,7 +3,7 @@ import { ArrowRight, ArrowUpRight, Plus, X } from 'lucide-react';
 import './landing.css';
 import { VigilMark } from './VigilMark';
 
-const REPO_URL = 'https://github.com/mrnetwork0001/Vigil';
+const REPO_URL = 'https://github.com/NetLayerLabs/Vigil';
 
 const SECTIONS = [
   { id: 'proof', label: 'Proof' },
