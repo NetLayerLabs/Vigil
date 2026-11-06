@@ -1529,6 +1529,7 @@ function inlineMarkdown(line: string): React.ReactNode[] {
 function stageTone(stage: string): string {
   if (stage === 'resolved_promoted') return 'wr-tag--brand';
   if (stage === 'resolved_rolled_back') return '';
+  if (stage === 'interrupted') return '';
   if (stage === 'awaiting_human_gate') return 'wr-tag--warn';
   if (stage === 'reproducing_patching') return 'wr-tag--violet';
   return 'wr-tag--alert';
