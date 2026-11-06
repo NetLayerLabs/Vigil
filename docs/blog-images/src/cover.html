@@ -1,0 +1,24 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="base.css"><style>
+.frame{display:flex;flex-direction:column}
+.head{font-size:68px;font-weight:600;letter-spacing:-.035em;line-height:1.02;max-width:1080px}
+.head em{font-style:normal;color:var(--brand-d)}
+.lede{font-size:22px;color:var(--mute);margin-top:22px;max-width:900px;line-height:1.4}
+.rooms{margin-top:56px;display:grid;grid-template-columns:1fr 44px 1fr 44px 1fr;align-items:stretch}
+.room{background:var(--card);border:1px solid var(--rule);padding:20px 22px}
+.room.ship{border:2px solid var(--brand-d)}
+.room .n{font-family:'Geist Mono',monospace;font-size:18px;font-weight:500}
+.room .w{font-size:16px;color:var(--mute);margin-top:8px;line-height:1.4}
+.room .chip{margin-top:12px;font-size:14px}
+.arr{display:flex;align-items:center;justify-content:center;font-size:26px;color:var(--mute)}
+</style></head><body><div class="frame">
+<div class="top"><img src="logo.png" alt=""><span class="label">Built on Switch · Flip the Switch Hackathon, Track 01</span></div>
+<div class="head">Claude Code fixes the outage.<br><em>A person ships it.</em></div>
+<div class="lede">Three linked Switch rooms turn a solo coding agent into an incident-response teammate that cannot approve its own release.</div>
+<div class="rooms">
+  <div class="room"><div class="n">#vigil-incidents</div><div class="w">@vigil-sentinel takes command and writes the dossier</div></div>
+  <div class="arr">→</div>
+  <div class="room"><div class="n">#vigil-hotfix</div><div class="w">@claude-code writes the fix; @vigil-patcher tests it</div></div>
+  <div class="arr">→</div>
+  <div class="room ship"><div class="n">#vigil-releases</div><div class="w">Only a person in chat can ship</div><span class="chip ok">approve INC-2044 promote</span></div>
+</div>
+</div></body></html>

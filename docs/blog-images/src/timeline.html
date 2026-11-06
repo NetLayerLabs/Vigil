@@ -1,0 +1,26 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="base.css"><style>
+.row{display:grid;grid-template-columns:110px 34px 290px 1fr;align-items:start;min-height:86px}
+.t{font-family:'Geist Mono',monospace;font-size:20px;font-weight:500;padding-top:2px}
+.rail{position:relative;height:100%}
+.rail:before{content:'';position:absolute;left:16px;top:0;bottom:0;width:1px;background:var(--rule)}
+.row:first-of-type .rail:before{top:12px}.row:last-of-type .rail:before{bottom:calc(100% - 12px)}
+.dot{position:absolute;left:10px;top:7px;width:13px;height:13px;background:var(--bg);border:2px solid var(--ink)}
+.dot.g{background:var(--brand);border-color:var(--brand-d)}
+.who{font-size:19px;font-weight:600;padding-top:1px}
+.who small{display:block;font-family:'Geist Mono',monospace;font-size:13.5px;font-weight:400;color:var(--mute);margin-top:3px}
+.what{font-size:18px;line-height:1.45;padding-bottom:26px}
+.what .chip{margin-top:10px;font-size:14px}
+.stats{display:flex;gap:0;margin-top:14px;border:1px solid var(--rule);background:#fff}
+.stat{flex:1;padding:18px 22px;border-right:1px solid var(--rule)}.stat:last-child{border-right:0}
+.stat b{display:block;font-size:30px;font-weight:600;letter-spacing:-.02em}
+.stat span{font-size:15px;color:var(--mute)}
+</style></head><body><div class="frame">
+<div class="top"><img src="logo.png" alt=""><span class="label">INC-2044 on the live Switch server · Nov 6, 2026 (UTC)</span></div>
+<div class="row"><div class="t">17:32</div><div class="rail"><div class="dot"></div></div><div class="who">checkout-api<small>v2.14.0</small></div><div class="what">A bad release goes out. JPY checkouts start returning <code>HTTP 500</code>, and the service raises its own alert.</div></div>
+<div class="row"><div class="t"></div><div class="rail"><div class="dot"></div></div><div class="who">@vigil-sentinel<small>#vigil-incidents</small></div><div class="what">Takes <code>incident-commander</code>, writes the dossier, opens <code>#hotfix-INC-2044</code> and hands the failing request to <code>@claude-code</code>.</div></div>
+<div class="row"><div class="t"></div><div class="rail"><div class="dot"></div></div><div class="who">@claude-code<small>#vigil-hotfix · patch-author</small></div><div class="what">Reproduces the 500, finds the regression commit and writes a 12-line fix in <code>src/cartPricing.ts</code>.<br><span class="chip">@vigil-patcher verify INC-2044</span></div></div>
+<div class="row"><div class="t"></div><div class="rail"><div class="dot"></div></div><div class="who">@vigil-patcher<small>#vigil-hotfix · red-team-verifier</small></div><div class="what">Commits the candidate and checks it on its own: the service's tests plus a replay of the failing request on staging. 7 of 7 pass.</div></div>
+<div class="row"><div class="t"></div><div class="rail"><div class="dot"></div></div><div class="who">A person<small>Mattermost · #vigil-releases</small></div><div class="what"><span class="chip ok" style="margin-top:0">@vigil-release-gate approve INC-2044 promote</span><br>The gate checks the sender is a person and the fix is verified: <code>APPROVED_PROMOTE</code>.</div></div>
+<div class="row"><div class="t">17:47</div><div class="rail"><div class="dot g"></div></div><div class="who">@vigil-release-gate<small>#vigil-releases</small></div><div class="what"><code>v2.14.1-hotfix</code> is live, all five canary probes pass, the postmortem is written and the incident closes.</div></div>
+<div class="stats"><div class="stat"><b>15 min</b><span>alert to closed</span></div><div class="stat"><b>12 lines</b><span>written by Claude Code</span></div><div class="stat"><b>7 of 7</b><span>checks before approval</span></div><div class="stat"><b>5 of 5</b><span>canary probes after</span></div></div>
+</div></body></html>

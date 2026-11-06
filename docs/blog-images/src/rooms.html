@@ -1,0 +1,51 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="base.css"><style>
+.grid{display:grid;grid-template-columns:1fr 70px 1fr 70px 1fr;align-items:stretch}
+.room{background:var(--card);border:1px solid var(--rule);display:flex;flex-direction:column}
+.room.ship{border:2px solid var(--brand-d)}
+.rh{padding:18px 22px;border-bottom:1px solid var(--rule)}
+.rh .n{font-family:'Geist Mono',monospace;font-size:21px;font-weight:500}
+.rh .p{font-size:16px;color:var(--mute);margin-top:4px}
+.sec{padding:16px 22px;border-bottom:1px solid var(--rule)}
+.sec:last-child{border-bottom:0}
+.k{font-family:'Geist Mono',monospace;font-size:13px;color:var(--mute);text-transform:lowercase;margin-bottom:8px}
+.who{font-size:17px;font-weight:600}
+.role{font-family:'Geist Mono',monospace;font-size:14.5px;color:var(--brand-d);margin-top:2px}
+.who+.role+.who{margin-top:12px}
+.doc{font-family:'Geist Mono',monospace;font-size:14.5px}
+.txt{font-size:15.5px;color:var(--ink);line-height:1.45}
+.arr{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:6px}
+.arr b{font-size:28px;font-weight:400;color:var(--ink)}
+.arr span{font-size:12.5px;color:var(--mute);line-height:1.3}
+.back{margin-top:22px;border:1px dashed var(--mute);border-top:0;height:34px;margin-left:16%;margin-right:16%;position:relative}
+.back span{position:absolute;left:50%;transform:translateX(-50%);bottom:-12px;background:var(--bg);padding:0 12px;font-size:14px;color:var(--mute)}
+.back:before{content:'↑';position:absolute;left:-9px;top:-14px;font-size:20px;color:var(--mute)}
+.wr{margin-top:34px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:0}
+.wrbox{grid-column:2;border:1px dashed var(--brand-d);padding:14px 18px;background:#fff}
+.foot{margin-top:28px;font-size:15px;color:var(--mute)}
+</style></head><body><div class="frame">
+<div class="top"><img src="logo.png" alt=""><span class="label">Three rooms on one Switch server, linked in a cycle</span></div>
+<div class="grid">
+ <div class="room">
+  <div class="rh"><div class="n">#vigil-incidents</div><div class="p">Triage and command</div></div>
+  <div class="sec"><div class="k">agents and roles</div><div class="who">@vigil-sentinel</div><div class="role">incident-commander (exclusive)</div></div>
+  <div class="sec"><div class="k">in</div><div class="txt">The service's own 5xx alert</div></div>
+  <div class="sec"><div class="k">writes</div><div class="doc">blast-radius-dossier</div><div class="txt" style="margin-top:6px">Exception, suspect commit, file:line, failing request</div></div>
+ </div>
+ <div class="arr"><b>→</b><span>hands the bug over to be fixed</span></div>
+ <div class="room">
+  <div class="rh"><div class="n">#vigil-hotfix</div><div class="p">Fix and verify</div></div>
+  <div class="sec"><div class="k">agents and roles</div><div class="who">@claude-code</div><div class="role">patch-author</div><div class="who">@vigil-patcher</div><div class="role">red-team-verifier</div></div>
+  <div class="sec"><div class="k">checks</div><div class="txt">Real test suite, then the failing request replayed on a staging copy</div></div>
+  <div class="sec"><div class="k">writes</div><div class="doc">patch-verification-report</div></div>
+ </div>
+ <div class="arr"><b>→</b><span>sends the verified fix for approval</span></div>
+ <div class="room ship">
+  <div class="rh"><div class="n">#vigil-releases</div><div class="p">The human gate</div></div>
+  <div class="sec"><div class="k">agents and people</div><div class="who">@vigil-release-gate</div><div class="role">release-gatekeeper (plain code)</div><div class="who">A person in Mattermost</div><div class="role" style="color:var(--ink)">approve INC-xxxx promote</div></div>
+  <div class="sec"><div class="k">reads</div><div class="doc">release-safety-policy</div></div>
+  <div class="sec"><div class="k">writes</div><div class="doc">postmortem-inc-xxxx</div></div>
+ </div>
+</div>
+<div class="back"><span>reports the deploy and the postmortem</span></div>
+<div class="wr"><div class="wrbox"><div class="doc" style="font-size:15.5px">#hotfix-INC-xxxx</div><div class="txt" style="margin-top:4px;color:var(--mute)">A workroom per incident, created from a template, linked from #vigil-hotfix and archived when the incident closes</div></div></div>
+</div></body></html>

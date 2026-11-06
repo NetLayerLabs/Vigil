@@ -1,0 +1,31 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="base.css"><style>
+.msg{display:flex;align-items:center;gap:18px;margin-bottom:26px}
+.msg .k{font-size:17px;color:var(--mute)}
+.list{border:1px solid var(--rule);background:#fff}
+.chk{display:grid;grid-template-columns:52px 1fr 380px;align-items:center;border-bottom:1px solid var(--rule);min-height:74px}
+.chk:last-child{border-bottom:0}
+.num{font-family:'Geist Mono',monospace;font-size:16px;color:var(--mute);text-align:center}
+.q{font-size:19px;font-weight:500;padding:14px 0}
+.q small{display:block;font-family:'Geist Mono',monospace;font-size:13.5px;font-weight:400;color:var(--brand-d);margin-top:4px}
+.no{font-family:'Geist Mono',monospace;font-size:14.5px;color:var(--red);padding-right:22px}
+.no:before{content:'no → ';color:var(--mute)}
+.side{background:#fbfbf8}
+.side .q{font-weight:400;color:var(--mute);font-size:17px}
+.side .no{color:var(--brand-d)}.side .no:before{content:'rollback → ';color:var(--mute)}
+.end{display:flex;align-items:center;gap:22px;margin-top:26px}
+.end .chip{font-size:16px;padding:10px 16px}
+.end .note{font-size:17px;color:var(--mute)}
+</style></head><body><div class="frame">
+<div class="top"><img src="logo.png" alt=""><span class="label">The release gate: plain code, no model</span></div>
+<div class="msg"><span class="k">A chat message arrives in #vigil-releases</span><span class="chip">@vigil-release-gate approve INC-2044 promote</span></div>
+<div class="list">
+ <div class="chk"><div class="num">1</div><div class="q">Is the sender a person?<small>Agents, Switch itself and unknown senders are refused</small></div><div class="no">REJECTED_AGENT_SENDER</div></div>
+ <div class="chk"><div class="num">2</div><div class="q">Is it approve … promote or rollback?</div><div class="no">REJECTED_UNRECOGNIZED_COMMAND</div></div>
+ <div class="chk"><div class="num">3</div><div class="q">Does it name the open incident?</div><div class="no">REJECTED_INCIDENT_MISMATCH</div></div>
+ <div class="chk"><div class="num">4</div><div class="q">Is this person an allowed approver?<small>allowed_approvers, read from the release-safety-policy room document</small></div><div class="no">REJECTED_UNAUTHORIZED_APPROVER</div></div>
+ <div class="chk side"><div class="num"></div><div class="q">Rolling back to the last good release is always allowed</div><div class="no">APPROVED_ROLLBACK</div></div>
+ <div class="chk"><div class="num">5</div><div class="q">Did the fix pass verification?<small>Tests and the staging replay; a discarded candidate never ships</small></div><div class="no">REJECTED_UNVERIFIED_PATCH</div></div>
+ <div class="chk"><div class="num">6</div><div class="q">Is the diff inside the policy?<small>max_changed_lines and forbidden_paths, from the same room document</small></div><div class="no">REJECTED_DIFF_POLICY_VIOLATION</div></div>
+</div>
+<div class="end"><span class="chip ok">APPROVED_PROMOTE</span><span class="note">then every canary probe must pass before the incident closes</span></div>
+</div></body></html>
