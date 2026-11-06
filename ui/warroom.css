@@ -125,7 +125,7 @@
 }
 .wr-brand { display: flex; align-items: center; gap: 14px; min-width: 0; }
 .wr-home { font-size: 17px !important; color: var(--ink); text-decoration: none; }
-.wr-home svg { width: 24px !important; height: 24px !important; }
+.wr-home .vigil-lockup { height: 26px; }
 .wr-top-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
 
 .wr-telemetry {

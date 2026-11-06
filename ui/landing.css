@@ -126,7 +126,7 @@
 .vl-nav { position: relative; z-index: 2; display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 16px; }
 .vl-logo { display: inline-flex; align-items: center; gap: 10px; color: var(--ink); font-weight: 600; font-size: 18px; letter-spacing: -0.03em; transition: transform 0.35s var(--ease); }
 .vl-logo:hover { transform: translateY(-1px); }
-.vl-logo svg { width: 26px; height: 26px; flex-shrink: 0; }
+.vl-logo .vigil-lockup { display: block; height: 28px; width: auto; }
 
 .vl-navlinks {
   justify-self: end; display: flex; gap: clamp(20px, 2.4vw, 32px); padding: 14px 0;
@@ -211,7 +211,7 @@
 }
 .vl-sticky.is-shown { transform: none; }
 .vl-sticky .vl-logo { font-size: 17px; }
-.vl-sticky .vl-logo svg { width: 24px; }
+.vl-sticky .vl-logo .vigil-lockup { height: 24px; }
 .vl-sticky-links { display: flex; gap: clamp(16px, 2vw, 28px); flex: 1; justify-content: flex-end; }
 .vl-sticky-link { position: relative; font-size: 14px; font-weight: 500; letter-spacing: -0.01em; color: var(--soft); transition: color 0.22s var(--ease); }
 .vl-sticky-link::after { content: ''; position: absolute; left: 0; right: 0; bottom: -6px; height: 2px; background: var(--brand); transform: scaleX(0); transform-origin: left; transition: transform 0.28s var(--ease); }
@@ -328,6 +328,8 @@
 .vl-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 18px; padding: 36px var(--pad-x) 40px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; line-height: 1.55; }
 .vl-footer a:hover { color: var(--ink); }
 .vl-footer nav { display: flex; gap: 22px; flex-wrap: wrap; }
+.vl-footer-brand { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+.vl-footer-brand .vigil-lockup { height: 24px; }
 
 /* ==========================================================================
    RESPONSIVE + MOTION PREFERENCES

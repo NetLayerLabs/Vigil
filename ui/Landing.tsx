@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ArrowRight, ArrowUpRight, Plus, X } from 'lucide-react';
 import './landing.css';
-import { VigilMark } from './VigilMark';
+import { VigilLogo } from './VigilMark';
 
 const REPO_URL = 'https://github.com/NetLayerLabs/Vigil';
 
@@ -147,8 +147,7 @@ export function Landing({ onLaunch }: { onLaunch: () => void }) {
       {/* ───────────────────────── Sticky header ───────────────────────── */}
       <header className={`vl-sticky ${stickyShown ? 'is-shown' : ''}`} aria-hidden={!stickyShown}>
         <a href="#top" className="vl-logo" aria-label="Vigil, back to top">
-          <VigilMark />
-          Vigil
+          <VigilLogo />
         </a>
         <nav className="vl-sticky-links" aria-label="Sections">
           {SECTIONS.map((s) => (
@@ -183,8 +182,7 @@ export function Landing({ onLaunch }: { onLaunch: () => void }) {
       <nav id="vl-drawer" className={`vl-drawer ${menuOpen ? 'is-open' : ''}`} aria-label="Menu" aria-hidden={!menuOpen}>
         <div className="vl-drawer-head">
           <span className="vl-logo">
-            <VigilMark />
-            Vigil
+            <VigilLogo />
           </span>
           <button type="button" className="vl-drawer-close" aria-label="Close menu" onClick={() => setMenuOpen(false)}>
             <X />
@@ -231,8 +229,7 @@ export function Landing({ onLaunch }: { onLaunch: () => void }) {
 
         <header className="vl-nav">
           <a href="#top" className="vl-logo" aria-label="Vigil">
-            <VigilMark />
-            Vigil
+            <VigilLogo />
           </a>
           <nav className="vl-navlinks" aria-label="Primary">
             {SECTIONS.map((s, i) => (
@@ -851,9 +848,12 @@ export function Landing({ onLaunch }: { onLaunch: () => void }) {
       </section>
 
       <footer className="vl-footer">
-        <span>
-          Vigil · built for the Flip the Switch Hackathon by WeMakeDevs and Switch AI · MIT License
-        </span>
+        <div className="vl-footer-brand">
+          <a href="#top" className="vl-logo" aria-label="Vigil, back to top">
+            <VigilLogo />
+          </a>
+          <span>Built for the Flip the Switch Hackathon by WeMakeDevs and Switch AI · MIT License</span>
+        </div>
         <nav>
           <a href={REPO_URL} target="_blank" rel="noreferrer">
             GitHub

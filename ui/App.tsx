@@ -17,7 +17,7 @@ import {
   UserCheck,
   X,
 } from 'lucide-react';
-import { VigilMark } from './VigilMark';
+import { VigilLogo } from './VigilMark';
 import './landing.css';
 import './warroom.css';
 
@@ -462,8 +462,7 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
     return (
       <div className="wr wr-loading">
         <span className="vl-logo">
-          <VigilMark />
-          Vigil
+          <VigilLogo />
         </span>
         <span className="wr-label">
           <span className="wr-sq is-pulse" />
@@ -502,8 +501,7 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
               onHome();
             }}
           >
-            <VigilMark />
-            Vigil
+            <VigilLogo />
           </a>
           <span className="wr-sep" />
           <span className="wr-label">
@@ -752,8 +750,7 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
         <aside id="wr-drawer" className={`wr-col wr-left ${drawerOpen ? 'is-open' : ''}`}>
           <div className="wr-drawer-head">
             <span className="vl-logo wr-home">
-              <VigilMark />
-              Vigil
+              <VigilLogo />
             </span>
             <button type="button" className="wr-drawer-close" aria-label="Close" onClick={() => setDrawerOpen(false)}>
               <X />
