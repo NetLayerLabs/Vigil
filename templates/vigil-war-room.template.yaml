@@ -121,16 +121,16 @@ rooms:
         value:
           urls:
             - "http://localhost:4020/health"
-            - "http://localhost:4020/api/releases"
+            - "http://localhost:4020/metrics"
     docs:
       - name: "incident-runbook"
         description: "Standard operating procedures for SEV-1/SEV-2 checkout incidents"
         instructions: "Follow this runbook on every 5xx error spike before escalating to #hotfix."
         content: |
           # Checkout Service Incident Runbook
-          - **SLO Threshold:** HTTP 5xx > 1.5% over 60s or p99 > 850ms triggers SEV-1.
-          - **Last Known Good Release:** `v2.13.2` (rollback safe, zero schema migrations).
-          - **Escalation Path:** `#vigil-incidents` -> `#vigil-hotfix` -> `#vigil-releases` (Human Sign-off Mandatory).
+          - **When an incident opens:** the service reports its first server error on a new release, or a monitoring tool alerts.
+          - **Last good release:** `v2.13.2`. Rolling back to it is always allowed.
+          - **Path:** `#{team}-incidents` -> `#{team}-hotfix` -> `#{team}-releases`. A person approves every release.
     instructions: |
       This room is the primary incident command center for {team}.
       `@{team}-sentinel` triages alerts, claims `incident-commander`, writes `blast-radius-dossier`,

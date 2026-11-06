@@ -26,4 +26,4 @@ VIGIL_TARGET=targets/my-service.target.json npm start
 | `canaries` | yes | `[{ "name", "body" }]`. Every probe must return 2xx after a release before the incident can close. |
 | `faults` | yes | `"builtin-checkout"` enables the three seeded regressions, which apply to the demo service only. `"none"` turns chaos releases off. |
 
-The service and its tests run with a minimal environment and none of Vigil's secrets. With `VIGIL_SERVICE_USER` set, they also run as that unprivileged user. For a service other than the demo, alerts come from your monitoring tool through `/api/webhooks/{alertmanager,sentry,generic}` (see the README).
+The service and its tests run with a minimal environment and none of Vigil's secrets. With `VIGIL_SERVICE_USER` set, they also run as that unprivileged user. Alerts from a monitoring tool (`/api/webhooks/{alertmanager,sentry,generic}`, see the README) open an incident only while a release Vigil deployed and can trace is live, so it knows which commit to revert or patch. Today only the demo service's chaos releases are deployed that way; opening incidents for releases shipped by your own pipeline is not built yet.
