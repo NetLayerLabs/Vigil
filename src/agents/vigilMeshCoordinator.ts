@@ -248,8 +248,10 @@ export class VigilMeshCoordinator {
       `@switch-agent-${gateName}:switch.local`,
     ]);
 
-    // 2. Provision the 3-room linked group topology from `templates/vigil-war-room.template.yaml` if requested
-    if (this.opts.provisionTemplateViaApi !== false) {
+    // 2. Embedded server: provision the 3-room linked group from `templates/vigil-war-room.template.yaml`
+    //    over its HTTP template endpoint before anyone connects. (A real Switch server is provisioned
+    //    through the `create_room_from_yaml` operation below, once the agents hold open connections.)
+    if (this.opts.provisionTemplateViaApi) {
       const resolvedPath =
         templateYamlPath ?? path.resolve(process.cwd(), 'templates/vigil-war-room.template.yaml');
       const yamlContent = readFileSync(resolvedPath, 'utf8');
@@ -320,20 +322,45 @@ export class VigilMeshCoordinator {
       this.releaseGateClient.discoverOperations(),
     ]);
 
-    // A newly registered Switch agent answers only its owner. The mesh needs agent-to-agent handoffs
-    // and approvals from any human teammate, so widen addressing (needs no connection).
-    await Promise.all(
-      [this.sentinelClient, this.patcherClient, this.releaseGateClient].map((c) =>
-        c.updateAddressing('anyone').catch(() => undefined),
-      ),
-    );
+    // 4. Open live WebSockets and receive `connection_state`. A real Switch server only accepts
+    //    operations from a caller with an open connection, so everything below runs after this.
+    await Promise.all([
+      this.sentinelClient.connect(),
+      this.patcherClient.connect(),
+      this.releaseGateClient.connect(),
+    ]);
 
-    // Resolve room IDs from Switch Server
-    const rooms = await this.sentinelClient.listRooms();
-    const allPatcherRooms = await this.patcherClient.listRooms();
-    const mergedRooms = new Map<string, SwitchRoomDetail>();
-    for (const r of [...rooms, ...allPatcherRooms]) {
-      mergedRooms.set(r.name, r);
+    // 5. A newly registered Switch agent answers only its owner. The mesh needs agent-to-agent handoffs
+    //    and approvals from any human teammate, so widen addressing to `anyone`.
+    if (this.sentinelClient.isSwitchCore()) {
+      // switch-core refuses an agent changing its own setting but lets it change a sibling agent with
+      // the same owner, so the sentinel opens up the patcher and gate, and the patcher the sentinel.
+      const widen: Array<[SwitchAgentClient, string, string]> = [
+        [this.sentinelClient, patcherCreds.id, patcherName],
+        [this.sentinelClient, gateCreds.id, gateName],
+        [this.patcherClient, sentinelCreds.id, sentinelName],
+      ];
+      await Promise.all(
+        widen.map(([client, targetId, targetName]) =>
+          client.updateAddressing('anyone', targetId).catch((err: Error) => {
+            console.warn(`[vigil] could not set addressing=anyone on ${targetName}: ${err.message}`);
+          }),
+        ),
+      );
+    } else {
+      await Promise.all(
+        [this.sentinelClient, this.patcherClient, this.releaseGateClient].map((c) =>
+          c.updateAddressing('anyone').catch(() => undefined),
+        ),
+      );
+    }
+
+    // 6. Resolve room IDs. On a real Switch server, create the rooms from the template the first time.
+    let mergedRooms = await this.collectRooms();
+    const expected = ['incidents', 'hotfix', 'releases'].map((r) => `${this.teamPrefix}-${r}`);
+    if (expected.some((name) => !mergedRooms.has(name)) && this.sentinelClient.isSwitchCore()) {
+      await this.provisionRoomsOnSwitchCore(templateYamlPath);
+      mergedRooms = await this.collectRooms();
     }
 
     const incRoom = mergedRooms.get(`${this.teamPrefix}-incidents`);
@@ -352,21 +379,56 @@ export class VigilMeshCoordinator {
       releasesRoomId: relRoom.id,
     };
 
-    // Wire message handlers BEFORE opening WebSockets
+    // A live server keeps rooms across Vigil restarts: number new incidents after the last workroom.
+    if (this.sentinelClient.isSwitchCore()) {
+      const all = await this.sentinelClient.listRooms(true).catch(() => []);
+      const used = all
+        .map((r) => /^hotfix-inc-(\d+)/i.exec(r.name)?.[1])
+        .filter((n): n is string => Boolean(n))
+        .map(Number);
+      if (used.length > 0) this.opts.checkoutService.seedIncidentSequence(Math.max(...used));
+    }
+
+    // 7. Rooms are known: start handling room traffic.
     this.wireSentinelHandlers();
     this.wirePatcherHandlers();
     this.wireReleaseGateHandlers();
 
-    // Open live WebSockets and receive `connection_state`
-    await Promise.all([
-      this.sentinelClient.connect(),
-      this.patcherClient.connect(),
-      this.releaseGateClient.connect(),
-    ]);
-
     // Subscribe checkout-api incident alerts directly to Sentinel
     this.opts.checkoutService.setIncidentWebhook(async (alert) => {
       await this.handleIncomingTelemetryAlert(alert);
+    });
+  }
+
+  /** Rooms the sentinel or patcher is assigned to, by name. */
+  private async collectRooms(): Promise<Map<string, SwitchRoomDetail>> {
+    const rooms = await this.sentinelClient.listRooms();
+    const allPatcherRooms = await this.patcherClient.listRooms();
+    const merged = new Map<string, SwitchRoomDetail>();
+    for (const r of [...rooms, ...allPatcherRooms]) {
+      merged.set(r.name, r);
+    }
+    return merged;
+  }
+
+  /**
+   * First run against a real Switch server: create `#{team}-incidents`, `#{team}-hotfix` and
+   * `#{team}-releases` (roles, documents, references, links) from the war-room template. The
+   * template's `agents:` block asks Switch Console to start managed coding agents; Vigil's agents
+   * already exist as live WebSocket agents, so that block is dropped and the rooms name them.
+   */
+  private async provisionRoomsOnSwitchCore(templateYamlPath?: string): Promise<void> {
+    const resolvedPath =
+      templateYamlPath ?? path.resolve(process.cwd(), 'templates/vigil-war-room.template.yaml');
+    const doc = YAML.parse(readFileSync(resolvedPath, 'utf8')) as {
+      agents?: unknown;
+      params?: Record<string, unknown>;
+    };
+    delete doc.agents;
+    for (const key of ['provider', 'location', 'directory']) delete doc.params?.[key];
+    await this.sentinelClient.createRoomsFromYaml(YAML.stringify(doc), {
+      team: this.teamPrefix,
+      bridge: this.opts.bridgeName ?? 'Mattermost',
     });
   }
 
@@ -521,6 +583,19 @@ export class VigilMeshCoordinator {
           exclusive: Boolean(r.exclusive),
         }))
       : [];
+
+    if (this.sentinelClient.isSwitchCore()) {
+      const inputs: Record<string, string> = { ...params };
+      delete inputs.$creator;
+      const [room] = await this.sentinelClient.createRoomsFromYaml(readFileSync(templatePath, 'utf8'), inputs);
+      if (!room) throw new Error(`create_room_from_yaml returned no room for ${record.incidentId}`);
+      // The template seats the patcher and the gate. The sentinel joins too, so it can close the room.
+      await this.sentinelClient.inviteAgentToRoom(room.id, this.sentinelClient.agentName);
+      await this.sentinelClient.linkRooms(hotfixRoomId, room.id, `per-incident red/blue workroom for ${record.incidentId}`);
+      record.workroom = { roomId: room.id, roomName: room.name, archived: false };
+      this.opts.onEventUpdate?.();
+      return;
+    }
 
     const created = await this.sentinelClient.createRoom({
       name: fill(room.name).toLowerCase(),
@@ -1008,6 +1083,7 @@ export class VigilMeshCoordinator {
         const senderIsAgent = ReleaseSafetyGate.evaluate({
           senderParticipantId: event.payload.sender,
           senderName: event.payload.sender_name,
+          senderKind: event.payload.sender_kind,
           messageBody: 'approve INC-0000 promote',
           activeIncidentId: 'INC-0000',
           knownAgentParticipantIds: this.knownAgentParticipantIds,
@@ -1089,6 +1165,7 @@ export class VigilMeshCoordinator {
         const decision = ReleaseSafetyGate.evaluate({
           senderParticipantId: event.payload.sender,
           senderName: event.payload.sender_name,
+          senderKind: event.payload.sender_kind,
           messageBody: body,
           activeIncidentId: active.incidentId,
           knownAgentParticipantIds: this.knownAgentParticipantIds,
