@@ -17,6 +17,37 @@ import {
   SwitchRoomLink,
 } from './types.js';
 
+/** Control frames. switch-core wraps them as `{event, data}`; Vigil's embedded server sends `{type, ...}`. */
+const CONTROL_EVENTS = new Set([
+  'connection_state',
+  'ping',
+  'gap',
+  'evicted',
+  'subscription_changed',
+  'room_released',
+  'refused',
+]);
+
+/** A document as switch-core lists it in `connect_to_room` (no content). */
+interface CoreDocumentRef {
+  id: string;
+  name: string;
+  description?: string;
+  instructions?: string;
+}
+
+/** A message inside switch-core's `read_context` threads. */
+interface CoreContextMessage {
+  id: string;
+  kind: string;
+  sender: string;
+  sender_name: string;
+  body: string;
+  timestamp: number;
+  attachments?: unknown[];
+  sender_kind?: string | null;
+}
+
 export interface SwitchAgentClientOptions {
   baseUrl: string;
   agentId: string;
@@ -77,6 +108,16 @@ export class SwitchAgentClient {
   private discoveredOps: Record<string, { description: string; input_schema: unknown }> = {};
   /** Chaos flag: a hung client keeps its socket open but stops answering pings and ignores events. */
   private hung = false;
+  /**
+   * Which server this client talks to. Vigil's embedded protocol server takes a `room_id` on every
+   * operation. A real Switch server (switch-core) binds operations to the room the connection last
+   * joined with `connect_to_room`, wraps control frames as `{event, data}`, and names some arguments
+   * differently. Detected from the first `connection_state` frame.
+   */
+  private dialect: 'embedded' | 'switch-core' = 'embedded';
+  /** switch-core: the room this connection is bound to, and a queue so room-bound ops never interleave. */
+  private boundRoomId: string | null = null;
+  private roomChain: Promise<unknown> = Promise.resolve();
 
   constructor(opts: SwitchAgentClientOptions) {
     this.baseUrl = opts.baseUrl.replace(/\/+$/, '');
@@ -106,6 +147,11 @@ export class SwitchAgentClient {
 
   public isHung(): boolean {
     return this.hung;
+  }
+
+  /** True once the server has identified itself as a real Switch server (switch-core). */
+  public isSwitchCore(): boolean {
+    return this.dialect === 'switch-core';
   }
 
   /**
@@ -227,7 +273,7 @@ export class SwitchAgentClient {
       socket.on('message', (raw) => {
         let parsed: SwitchIncomingFrame;
         try {
-          parsed = JSON.parse(raw.toString()) as SwitchIncomingFrame;
+          parsed = this.normalizeFrame(JSON.parse(raw.toString()));
         } catch {
           return;
         }
@@ -302,6 +348,8 @@ export class SwitchAgentClient {
   ): void {
     switch (frame.type) {
       case 'connection_state': {
+        // A fresh attachment: re-bind to a room before the next room-scoped operation.
+        this.boundRoomId = null;
         this.generation = frame.generation;
         this.coveredRooms = [...frame.rooms];
         if (frame.cursor > this.cursor) {
@@ -357,6 +405,23 @@ export class SwitchAgentClient {
         break;
       }
     }
+  }
+
+  /** switch-core sends control frames as `{event, data}`; fold them into the `{type, ...}` shape. */
+  private normalizeFrame(raw: unknown): SwitchIncomingFrame {
+    const f = raw as { type?: unknown; event?: unknown; data?: Record<string, unknown>; id?: unknown };
+    if (
+      f &&
+      typeof f === 'object' &&
+      f.type === undefined &&
+      typeof f.event === 'string' &&
+      CONTROL_EVENTS.has(f.event) &&
+      typeof f.id !== 'number'
+    ) {
+      this.dialect = 'switch-core';
+      return { type: f.event, ...(f.data ?? {}) } as SwitchControlFrame;
+    }
+    return raw as SwitchIncomingFrame;
   }
 
   private handleEviction(frame: SwitchEvictedFrame): void {
@@ -474,8 +539,41 @@ export class SwitchAgentClient {
   }
 
   // ---- Typed Convenience Wrappers over the Switch Operation Catalog ----
+  //
+  // Each wrapper speaks both dialects. On switch-core, room-scoped operations run inside `inRoom`,
+  // which binds the connection with `connect_to_room` first and queues them so two rooms never
+  // interleave on one connection. Responses are mapped back to Vigil's own types.
+
+  /** Run `fn` with this connection bound to `roomId` (switch-core). Calls are serialized per client. */
+  private inRoom<T>(roomId: string, fn: () => Promise<T>): Promise<T> {
+    const run = async (): Promise<T> => {
+      if (this.boundRoomId !== roomId) {
+        await this.describeRoom(roomId);
+      }
+      return fn();
+    };
+    const next = this.roomChain.then(run, run);
+    this.roomChain = next.catch(() => undefined);
+    return next;
+  }
+
+  /** `connect_to_room`: binds the connection and returns the room as switch-core describes it. */
+  private async describeRoom(roomId: string): Promise<{
+    documents?: CoreDocumentRef[];
+    [key: string]: unknown;
+  }> {
+    const detail = await this.callOperation<{ documents?: CoreDocumentRef[] }>('connect_to_room', {
+      room_id: roomId,
+      include_general_instructions: false,
+    });
+    this.boundRoomId = roomId;
+    return detail;
+  }
 
   public async connectToRoom(roomId: string): Promise<SwitchRoomDetail> {
+    if (this.dialect === 'switch-core') {
+      return this.inRoom(roomId, async () => (await this.describeRoom(roomId)) as unknown as SwitchRoomDetail);
+    }
     return this.callOperation<SwitchRoomDetail>('connect_to_room', { room_id: roomId });
   }
 
@@ -483,7 +581,14 @@ export class SwitchAgentClient {
     return this.callOperation<SwitchRoomDetail>('get_room_detail', { room_id: roomId });
   }
 
-  public async listRooms(): Promise<SwitchRoomDetail[]> {
+  public async listRooms(includeArchived = false): Promise<SwitchRoomDetail[]> {
+    if (this.dialect === 'switch-core') {
+      const rooms = await this.callOperation<Array<{ room_id: string; name: string; archived?: boolean }>>(
+        'list_rooms',
+        includeArchived ? { include_archived: true } : {},
+      );
+      return rooms.map((r) => ({ ...r, id: r.room_id }) as unknown as SwitchRoomDetail);
+    }
     return this.callOperation<SwitchRoomDetail[]>('list_rooms', {});
   }
 
@@ -491,10 +596,40 @@ export class SwitchAgentClient {
     room: SwitchRoomDetail;
     messages: Array<SwitchMessagePayload & { seq: number }>;
   }> {
+    if (this.dialect === 'switch-core') {
+      const ctx = await this.callOperation<{
+        threads?: Array<{ root: CoreContextMessage; replies?: CoreContextMessage[] }>;
+      }>('read_context', { room_id: roomId, limit });
+      const messages: Array<SwitchMessagePayload & { seq: number }> = [];
+      for (const thread of ctx.threads ?? []) {
+        for (const m of [thread.root, ...(thread.replies ?? [])]) {
+          if (!m || m.kind !== 'message') continue;
+          messages.push({
+            addressed: false,
+            sender: m.sender,
+            sender_name: m.sender_name,
+            sender_kind: m.sender_kind ?? null,
+            message_id: m.id,
+            body: m.body,
+            timestamp: m.timestamp,
+            thread_id: m === thread.root ? null : thread.root.id,
+            attachments: [],
+            seq: 0,
+          });
+        }
+      }
+      messages.sort((a, b) => a.timestamp - b.timestamp);
+      return { room: { id: roomId } as SwitchRoomDetail, messages };
+    }
     return this.callOperation('read_context', { room_id: roomId, limit });
   }
 
   public async postMessage(roomId: string, content: string, threadId?: string): Promise<{ seq: number; message_id: string }> {
+    if (this.dialect === 'switch-core') {
+      return this.inRoom(roomId, () =>
+        this.callOperation('post_message', threadId ? { body: content, thread_id: threadId } : { body: content }),
+      );
+    }
     const args: Record<string, unknown> = { room_id: roomId, content };
     if (threadId) args.thread_id = threadId;
     return this.callOperation('post_message', args);
@@ -505,6 +640,14 @@ export class SwitchAgentClient {
     targetAgent: string,
     content: string,
   ): Promise<{ seq: number; message_id: string }> {
+    if (this.dialect === 'switch-core') {
+      // switch-core prefixes the mention itself; drop ours so it is not doubled.
+      const mention = new RegExp(`^\\s*@${targetAgent.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b\\s*`, 'i');
+      const body = content.replace(mention, '');
+      return this.inRoom(roomId, () =>
+        this.callOperation('send_targeted_message', { body, target_names: [targetAgent] }),
+      );
+    }
     return this.callOperation('send_targeted_message', {
       room_id: roomId,
       target_agent: targetAgent,
@@ -513,20 +656,42 @@ export class SwitchAgentClient {
   }
 
   public async assumeRole(roomId: string, roleName: string): Promise<SwitchRole> {
+    if (this.dialect === 'switch-core') {
+      return this.inRoom(roomId, () => this.callOperation<SwitchRole>('assume_role', { role: roleName }));
+    }
     return this.callOperation<SwitchRole>('assume_role', { room_id: roomId, role_name: roleName });
   }
 
   public async releaseRole(roomId: string, roleName: string): Promise<{ released: boolean }> {
+    if (this.dialect === 'switch-core') {
+      // switch-core releases whichever role this agent holds in the bound room.
+      await this.inRoom(roomId, () => this.callOperation('release_role', {}));
+      return { released: true };
+    }
     return this.callOperation<{ released: boolean }>('release_role', {
       room_id: roomId,
       role_name: roleName,
     });
   }
 
+  /** Create a room document, or replace its content when one with that name already exists. */
   public async createRoomDocument(
     roomId: string,
     doc: { name: string; description: string; instructions: string; content: string },
   ): Promise<SwitchRoomDocument> {
+    if (this.dialect === 'switch-core') {
+      return this.inRoom(roomId, async () => {
+        const room = await this.describeRoom(roomId);
+        const existing = (room.documents ?? []).find((d) => d.name === doc.name);
+        if (existing) {
+          return this.callOperation<SwitchRoomDocument>('update_room_document', {
+            document_id: existing.id,
+            ...doc,
+          });
+        }
+        return this.callOperation<SwitchRoomDocument>('create_room_document', doc);
+      });
+    }
     return this.callOperation<SwitchRoomDocument>('create_room_document', {
       room_id: roomId,
       ...doc,
@@ -538,6 +703,24 @@ export class SwitchAgentClient {
     name: string,
     content: string,
   ): Promise<SwitchRoomDocument> {
+    if (this.dialect === 'switch-core') {
+      return this.inRoom(roomId, async () => {
+        const room = await this.describeRoom(roomId);
+        const existing = (room.documents ?? []).find((d) => d.name === name);
+        if (!existing) {
+          return this.callOperation<SwitchRoomDocument>('create_room_document', {
+            name,
+            description: name,
+            instructions: name,
+            content,
+          });
+        }
+        return this.callOperation<SwitchRoomDocument>('update_room_document', {
+          document_id: existing.id,
+          content,
+        });
+      });
+    }
     return this.callOperation<SwitchRoomDocument>('update_room_document', {
       room_id: roomId,
       name,
@@ -546,14 +729,48 @@ export class SwitchAgentClient {
   }
 
   public async loadInternalDocuments(roomId: string): Promise<SwitchRoomDocument[]> {
+    if (this.dialect === 'switch-core') {
+      return this.inRoom(roomId, async () => {
+        const room = await this.describeRoom(roomId);
+        const ids = (room.documents ?? []).map((d) => d.id);
+        if (ids.length === 0) return [];
+        return this.callOperation<SwitchRoomDocument[]>('load_internal_documents', { ids });
+      });
+    }
     return this.callOperation<SwitchRoomDocument[]>('load_internal_documents', { room_id: roomId });
   }
 
-  /** Widen who may address this agent (`owner_only` | `owner_and_owner_agents` | `anyone`). Needs no connection. */
+  /**
+   * Set who may address an agent (`anyone` lets any human teammate and any agent instruct it).
+   * switch-core refuses an agent changing its own setting, so pass a sibling agent's id there: an
+   * agent may change another agent its owner owns. The embedded server takes the caller's own id.
+   */
   public async updateAddressing(
     addressing: 'owner_only' | 'owner_and_owner_agents' | 'anyone',
+    targetAgentId: string = this.agentId,
   ): Promise<unknown> {
-    return this.callOperation('update_agent_detail', { agent_id: this.agentId, addressing });
+    return this.callOperation('update_agent_detail', { agent_id: targetAgentId, addressing });
+  }
+
+  /**
+   * Provision rooms from a Switch room template (`create_room_from_yaml`, switch-core). Returns the
+   * rooms created, with their ids.
+   */
+  public async createRoomsFromYaml(
+    yaml: string,
+    inputs: Record<string, unknown>,
+  ): Promise<Array<{ id: string; name: string }>> {
+    const result = await this.callOperation<{
+      room_id?: string;
+      room_name?: string;
+      rooms?: Array<{ room_id: string; room_name: string }>;
+      errors?: unknown[];
+    }>('create_room_from_yaml', { yaml, inputs });
+    if (Array.isArray(result.errors) && result.errors.length > 0) {
+      throw new Error(`create_room_from_yaml reported errors: ${JSON.stringify(result.errors)}`);
+    }
+    const rooms = result.rooms ?? (result.room_id ? [{ room_id: result.room_id, room_name: result.room_name ?? '' }] : []);
+    return rooms.map((r) => ({ id: r.room_id, name: r.room_name }));
   }
 
   public async createRoom(input: {
@@ -567,10 +784,33 @@ export class SwitchAgentClient {
     roles?: Array<{ name: string; instructions: string; exclusive: boolean }>;
     documents?: Array<{ name: string; description: string; instructions: string; content: string }>;
   }): Promise<SwitchRoomDetail> {
+    if (this.dialect === 'switch-core') {
+      const created = await this.callOperation<{ id?: string; room_id?: string; name?: string }>('create_room', {
+        name: input.name,
+        description: input.description ?? input.name,
+        instructions: input.instructions,
+        channel_type: input.channel_type,
+        agent_names: input.agents ?? [this.agentName],
+        user_names: input.users,
+        roles: input.roles,
+      });
+      const id = created.id ?? created.room_id ?? '';
+      for (const doc of input.documents ?? []) {
+        await this.createRoomDocument(id, doc);
+      }
+      return { ...created, id, name: created.name ?? input.name } as unknown as SwitchRoomDetail;
+    }
     return this.callOperation<SwitchRoomDetail>('create_room', input);
   }
 
   public async linkRooms(fromRoomId: string, toRoomId: string, label: string): Promise<SwitchRoomLink> {
+    if (this.dialect === 'switch-core') {
+      return this.callOperation<SwitchRoomLink>('link_rooms', {
+        source_room_id: fromRoomId,
+        target_room_id: toRoomId,
+        label,
+      });
+    }
     return this.callOperation<SwitchRoomLink>('link_rooms', {
       from_room_id: fromRoomId,
       to_room_id: toRoomId,
@@ -587,6 +827,21 @@ export class SwitchAgentClient {
   }
 
   public async listLinkedRooms(roomId: string): Promise<SwitchRoomLink[]> {
+    if (this.dialect === 'switch-core') {
+      const links = await this.inRoom(roomId, () =>
+        this.callOperation<Array<{ target_room_id: string; target_room_name: string; label: string }>>(
+          'list_linked_rooms',
+          {},
+        ),
+      );
+      return links.map((l) => ({
+        from_room_id: roomId,
+        from_room_name: '',
+        to_room_id: l.target_room_id,
+        to_room_name: l.target_room_name,
+        label: l.label,
+      }));
+    }
     return this.callOperation<SwitchRoomLink[]>('list_linked_rooms', { room_id: roomId });
   }
 
