@@ -278,6 +278,8 @@ The alert reported `HTTP 500 TypeError: Cannot read properties of undefined (rea
 
 On Nov 6, 2026 (UTC), the same incident ran against a real Switch server (switch-core 0.31.0, Mattermost 11.9) at `vigil-switch.netlayerlabs.com`. On first start Vigil created `#vigil-incidents`, `#vigil-hotfix` and `#vigil-releases` with their roles, documents and links through `create_room_from_yaml`. **01 JPY Zero-Decimal 500** reached the human gate in about 5 seconds as `INC-2042`: the sentinel held `incident-commander` and wrote `blast-radius-dossier`, `#hotfix-INC-2042` was created and linked, and the patcher handed off `v2.14.1-hotfix` (12 changed lines, 6/6 checks green). An approval posted by the `vigil-patcher` agent itself was refused with `REJECTED_AGENT_SENDER`, and an approval sent through the War Room page was refused with `403`.
 
+Later that day a public visitor shipped **03 Inventory Lock Leak 503** as `INC-2043`. The patcher reverted the bad commit (8 changed lines, 6/6 checks green), and a human typed `@vigil-release-gate approve INC-2043 promote` in Mattermost as `priya`. The gate returned `APPROVED_PROMOTE` for that Mattermost user, restarted `checkout-api` from the verified commit (`baf2907`, tagged `v2.14.1-hotfix`), and all five canary probes answered `200 OK` (worst 4 ms). It wrote `postmortem-inc-2043`, posted the closure in `#vigil-incidents`, and archived `#hotfix-INC-2043`. Error rate returned to 0%.
+
 ## Safety
 
 - **Agents cannot approve.** The gate rejects any sender the Switch server does not mark as a person (`sender_kind` other than `user`), any sender whose participant ID starts with `@switch-agent-`, whose ID or display name matches a known agent, or whose `@switch-user-*` handle is an agent's name in disguise (`src/gate/releaseSafetyGate.ts`, test *rejects agent handles disguised as human chat senders*).
@@ -300,9 +302,9 @@ On Nov 6, 2026 (UTC), the same incident ran against a real Switch server (switch
 | WebSocket frames, role leases, documents and links between the agents and the Switch server | |
 | Mode B: the live deployment runs switch-core 0.31.0 and Mattermost, where Priya is a real account | |
 
-**Verified against a real Switch server (Nov 6, 2026):** agent registration, the WebSocket handshake and heartbeats, room provisioning from the template, role leases, room documents, links, per-incident workrooms, and the gate refusing a real agent's approval (see [A real run](#a-real-run)). First contact needed client fixes, now in `src/protocol/switchClient.ts`: control frames arrive as `{event, data}`, operations act on the room the connection last joined with `connect_to_room`, several arguments are named differently, and an agent may not change its own addressing.
+**Verified against a real Switch server (Nov 6, 2026):** agent registration, the WebSocket handshake and heartbeats, room provisioning from the template, role leases, room documents, links, per-incident workrooms, the gate refusing a real agent's approval, and a human approval from Mattermost through promotion, canaries, postmortem and workroom archiving (see [A real run](#a-real-run)). First contact needed client fixes, now in `src/protocol/switchClient.ts`: control frames arrive as `{event, data}`, operations act on the room the connection last joined with `connect_to_room`, several arguments are named differently, and an agent may not change its own addressing.
 
-**Not yet verified on the live server:** a human approval from Mattermost through promotion, canaries and workroom archiving, and binding Claude Code into `#vigil-hotfix` through Switch Console. Both paths run in the embedded server's tests.
+**Not yet verified on the live server:** binding Claude Code into `#vigil-hotfix` through Switch Console as the external patch author. That path runs in the embedded server's tests.
 
 ## Tech stack
 
