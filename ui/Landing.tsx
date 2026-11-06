@@ -228,7 +228,6 @@ export function Landing({ onLaunch }: { onLaunch: () => void }) {
 
       {/* ───────────────────────── Hero ───────────────────────── */}
       <section className="vl-hero" id="top" ref={heroRef}>
-        <HeroScene />
 
         <header className="vl-nav">
           <a href="#top" className="vl-logo" aria-label="Vigil">
@@ -257,10 +256,9 @@ export function Landing({ onLaunch }: { onLaunch: () => void }) {
         </header>
 
         <main className="vl-hero-main">
-          <div className="vl-badge vl-badge--glass vl-wipe is-in" style={{ ['--d' as string]: '0.18s' }}>
-            <span className="vl-badge-mark" aria-hidden="true" />
-            Incident response on Switch Rooms
-          </div>
+          <p className="vl-kicker vl-fade is-in" style={{ ['--d' as string]: '0.18s' }}>
+            Incident response on Switch
+          </p>
           <h1 className="vl-headline">
             <span className="vl-mask">
               <span className="vl-rise is-in" style={{ ['--d' as string]: '0.26s' }}>
@@ -269,15 +267,14 @@ export function Landing({ onLaunch }: { onLaunch: () => void }) {
             </span>
             <span className="vl-mask">
               <span className="vl-rise is-in vl-line" style={{ ['--d' as string]: '0.4s' }}>
-                <span className="vl-muted">A human </span>
-                <span className="vl-accent">ships the fix.</span>
+                A person <span className="vl-accent">ships the fix.</span>
               </span>
             </span>
           </h1>
           <div className="vl-hero-actions">
             <button
               type="button"
-              className="vl-btn vl-btn--light vl-wipe is-in"
+              className="vl-btn vl-btn--dark vl-wipe is-in"
               style={{ ['--d' as string]: '0.56s' }}
               onClick={onLaunch}
             >
@@ -286,7 +283,7 @@ export function Landing({ onLaunch }: { onLaunch: () => void }) {
                 <ArrowRight />
               </span>
             </button>
-            <a href="#how" className="vl-btn vl-btn--ghost vl-wipe is-in" style={{ ['--d' as string]: '0.66s' }}>
+            <a href="#how" className="vl-btn vl-btn--outline vl-wipe is-in" style={{ ['--d' as string]: '0.66s' }}>
               <span>See how it works</span>
             </a>
           </div>
@@ -295,9 +292,9 @@ export function Landing({ onLaunch }: { onLaunch: () => void }) {
         <div className="vl-hero-foot">
           <p className="vl-hero-lede">
             <span className="vl-rise is-in" style={{ ['--d' as string]: '0.78s' }}>
-              Vigil runs a SEV-1 across three linked Switch rooms. A sentinel takes command, a patcher reverts the bad
-              commit and runs the real tests, and a deterministic gate waits for a teammate to type{' '}
-              <strong>approve</strong> in Mattermost, Discord, Telegram or Slack.
+              Vigil runs a production incident across three linked Switch rooms. A sentinel opens it, a patcher
+              (Vigil's own, or Claude Code) writes and tests the fix, and the release gate waits for a person to
+              type <strong>approve</strong> in Mattermost, Discord, Telegram or Slack.
             </span>
           </p>
 
@@ -329,7 +326,7 @@ export function Landing({ onLaunch }: { onLaunch: () => void }) {
                 </div>
                 <div className="vl-status-row">
                   <span>incident</span>
-                  <span>{snap.activeIncident ? `${snap.activeIncident.incidentId} · ${snap.activeIncident.stage}` : 'none'}</span>
+                  <span>{snap.activeIncident ? `${snap.activeIncident.incidentId} · ${snap.activeIncident.stage.replace(/_/g, ' ')}` : 'none'}</span>
                 </div>
               </>
             ) : (
@@ -344,12 +341,9 @@ export function Landing({ onLaunch }: { onLaunch: () => void }) {
 
       {/* ───────────────────────── Overview ───────────────────────── */}
       <section className="vl-section" id="overview" aria-label="Overview">
-        <div data-reveal="" style={{ marginBottom: 28 }}>
-          <div className="vl-badge vl-wipe">
-            <span className="vl-badge-mark" aria-hidden="true" />
-            Flip the Switch Hackathon · Track 01, Best Business Workflow
-          </div>
-        </div>
+        <p className="vl-kicker vl-fade" data-reveal="">
+          Flip the Switch Hackathon · Track 01, Best Business Workflow
+        </p>
         <div className="vl-mask" data-reveal="">
           <h2 className="vl-h1 vl-rise">
             Three rooms run the incident. <span className="vl-muted">One teammate </span>
@@ -628,7 +622,7 @@ export function Landing({ onLaunch }: { onLaunch: () => void }) {
               <span className="p">$ </span>staging replay POST /api/checkout <span className="ok">→ HTTP 200</span>
               {'\n\n'}
               <span className="h">@vigil-patcher  </span>
-              <span className="w">[INC-2041 PATCH VERIFIED]</span> handing off to #vigil-releases
+              <span className="w">INC-2041: fix verified.</span> Handing off to #vigil-releases.
             </pre>
           </div>
         </div>
@@ -663,7 +657,7 @@ export function Landing({ onLaunch }: { onLaunch: () => void }) {
             <tbody>
               <tr>
                 <td>Human sign-off</td>
-                <td>only @switch-user-* senders</td>
+                <td>only people; agents are refused</td>
                 <td className="mono">fixed</td>
                 <td className="mono">REJECTED_AGENT_SENDER</td>
               </tr>
@@ -832,28 +826,23 @@ export function Landing({ onLaunch }: { onLaunch: () => void }) {
 
       {/* ───────────────────────── Closing ───────────────────────── */}
       <section className="vl-cta" aria-label="Open the war room">
-        <HeroScene />
         <div className="vl-cta-inner">
-          <div data-reveal="">
-            <div className="vl-badge vl-badge--glass vl-wipe">
-              <span className="vl-badge-mark" aria-hidden="true" />
-              {snap ? `${agentsOnline} agents connected right now` : 'Three agents, three rooms, one human'}
-            </div>
-          </div>
+          <p className="vl-kicker vl-fade" data-reveal="">
+            {snap ? `${agentsOnline} agents connected right now` : 'Three agents, three rooms, one person'}
+          </p>
           <div className="vl-mask" data-reveal="">
             <h2 className="vl-h1 vl-rise" style={{ marginTop: 8 }}>
-              Watch the room work. <span className="vl-muted">Then </span>
-              <span className="vl-accent">break production.</span>
+              Watch the room work. Then <span className="vl-accent">break production.</span>
             </h2>
           </div>
           <div className="vl-hero-actions vl-fade" data-reveal="">
-            <button type="button" className="vl-btn vl-btn--light" onClick={onLaunch}>
+            <button type="button" className="vl-btn vl-btn--dark" onClick={onLaunch}>
               <span>Open the War Room</span>
               <span className="vl-btn-icon">
                 <ArrowRight />
               </span>
             </button>
-            <a href={REPO_URL} target="_blank" rel="noreferrer" className="vl-btn vl-btn--ghost">
+            <a href={REPO_URL} target="_blank" rel="noreferrer" className="vl-btn vl-btn--outline">
               <span>Read the code</span>
               <ArrowUpRight style={{ width: 15, height: 15 }} />
             </a>
@@ -1038,74 +1027,3 @@ function ProofRow({ layer, what, seeded }: { layer: string; what: string; seeded
 }
 
 /** Dawn coastline with a lighthouse sweeping its beam. Pure SVG + CSS, no images. */
-function HeroScene() {
-  return (
-    <div className="vl-scene" aria-hidden="true">
-      <div className="vl-scene-art">
-        <span className="vl-dawn" />
-        <svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMax slice">
-          <defs>
-            <linearGradient id="vl-sea" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" stopColor="#5f7886" />
-              <stop offset="0.35" stopColor="#2c3e4c" />
-              <stop offset="1" stopColor="#0b1219" />
-            </linearGradient>
-            <linearGradient id="vl-beam" x1="1" y1="0" x2="0" y2="0">
-              <stop offset="0" stopColor="#fff3c9" stopOpacity="0.85" />
-              <stop offset="0.45" stopColor="#fff3c9" stopOpacity="0.28" />
-              <stop offset="1" stopColor="#fff3c9" stopOpacity="0" />
-            </linearGradient>
-            <linearGradient id="vl-beam-r" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0" stopColor="#fff3c9" stopOpacity="0.6" />
-              <stop offset="1" stopColor="#fff3c9" stopOpacity="0" />
-            </linearGradient>
-            <radialGradient id="vl-lamp">
-              <stop offset="0" stopColor="#fffbe8" />
-              <stop offset="0.35" stopColor="#ffe9a3" stopOpacity="0.85" />
-              <stop offset="1" stopColor="#ffe9a3" stopOpacity="0" />
-            </radialGradient>
-            <radialGradient id="vl-glint" cx="0.5" cy="0.5" r="0.5">
-              <stop offset="0" stopColor="#ffeab0" stopOpacity="0.8" />
-              <stop offset="1" stopColor="#ffeab0" stopOpacity="0" />
-            </radialGradient>
-          </defs>
-
-          {/* far headlands */}
-          <path d="M0 640 C 160 600, 300 618, 440 596 S 760 572, 900 602 S 1180 590, 1320 610 S 1500 600, 1600 612 L1600 720 L0 720 Z" fill="#8aa1ad" opacity="0.55" />
-          <path d="M0 676 C 140 650, 260 668, 420 650 S 700 664, 860 676 S 1060 660, 1200 684 L1200 720 L0 720 Z" fill="#5b7280" opacity="0.7" />
-
-          {/* sea */}
-          <rect x="0" y="704" width="1600" height="196" fill="url(#vl-sea)" />
-          <ellipse className="vl-glint" cx="900" cy="742" rx="180" ry="14" fill="url(#vl-glint)" />
-          <g opacity="0.25" stroke="#cfe0e6" strokeWidth="1">
-            <line x1="120" y1="736" x2="260" y2="736" />
-            <line x1="420" y1="758" x2="520" y2="758" />
-            <line x1="760" y1="748" x2="900" y2="748" />
-            <line x1="980" y1="776" x2="1060" y2="776" />
-            <line x1="1380" y1="764" x2="1500" y2="764" />
-          </g>
-
-          {/* beams (behind the tower) */}
-          <polygon className="vl-beam" points="900,588 180,500 180,690" fill="url(#vl-beam)" />
-          <polygon className="vl-beam vl-beam--back" points="900,588 1700,560 1700,628" fill="url(#vl-beam-r)" />
-
-          {/* headland with lighthouse */}
-          <path d="M680 900 L730 774 C 760 734, 820 712, 870 704 L940 701 C 990 700, 1050 708, 1100 720 C 1160 734, 1230 728, 1600 736 L1600 900 Z" fill="#0f1720" />
-          <polygon points="886,702 914,702 908,606 892,606" fill="#e9ece6" />
-          <rect x="889.5" y="636" width="21" height="8" fill="#c0392b" opacity="0.85" />
-          <rect x="891.0" y="668" width="18" height="8" fill="#c0392b" opacity="0.85" />
-          <rect x="884.0" y="600" width="32" height="6" fill="#1a232d" />
-          <rect x="890.0" y="580" width="20" height="20" fill="#2a3540" />
-          <circle className="vl-lamp" cx="900.0" cy="590" r="26" fill="url(#vl-lamp)" />
-          <rect x="893.0" y="584" width="14" height="12" fill="#fff6d2" />
-          <polygon points="886,580 914,580 900,566" fill="#1a232d" />
-          <rect x="870.0" y="696" width="60" height="8" fill="#141d27" />
-        </svg>
-        <span className="vl-mist vl-mist--a" />
-        <span className="vl-mist vl-mist--b" />
-      </div>
-      <span className="vl-veil" />
-      <span className="vl-shade" />
-    </div>
-  );
-}
