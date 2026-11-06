@@ -1,125 +1,133 @@
 # Turning a solo coding agent into an incident-response teammate with Switch
 
-*Built for the Flip the Switch Hackathon by WeMakeDevs and Switch AI, Track 01: Best Business Workflow.*
+*How Switch rooms, roles and room documents let Claude Code fix a production bug while a human keeps the only key to production.*
 
-Every team that has adopted a coding agent has the same quiet problem. The agent is brilliant in one terminal and invisible everywhere else. During a production incident that invisibility turns into risk. This post walks through Vigil, an incident-to-hotfix war room we built on Switch, and what we learned about the Switch agent protocol along the way.
+Built for the Flip the Switch Hackathon (WeMakeDevs × Switch), Track 01: Best Business Workflow.
+Live: https://vigil.netlayerlabs.com · Code: https://github.com/NetLayerLabs/Vigil
 
-## The problem: three failure modes of a solo agent during a SEV-1
+Every team that has adopted a coding agent has the same quiet problem: the agent is brilliant in one terminal and invisible everywhere else. During a production incident, that invisibility turns into risk. This post walks through Vigil, an incident-to-hotfix workflow built on Switch, shows a real run where Claude Code fixed a live bug, and lists what we learned about the Switch agent protocol along the way. If you are new to Switch, the protocol notes near the end should save you a few hours.
 
-**Solo agents go dark.** One engineer asks Claude Code to fix the checkout crash. It does, locally. The on-call lead sees nothing until a deploy lands. Nobody can review the reasoning, because the reasoning lived in a terminal that is already closed.
+## The problem: three ways a solo agent fails during an outage
 
-**Nobody holds command.** Two responders pick up the same alert. Two agents stage conflicting patches. Nobody knows which candidate was verified against which reproduction, and the chat thread becomes the only audit trail.
+**It goes dark.** One engineer asks Claude Code to fix the checkout crash. It does, locally. The on-call lead sees nothing until a deploy lands, and nobody can review the reasoning, because it lived in a terminal that is already closed.
 
-**Agents hold deploy keys.** An autonomous agent with credentials can approve its own release. That is one prompt injection away from a self-inflicted outage.
+**Nobody holds command.** Two responders pick up the same alert. Two agents stage conflicting patches. Nobody knows which candidate was checked against which reproduction.
 
-Vigil's thesis is that these are coordination problems, not model problems. The fix is to put the agent inside the same room as the humans and make the room enforce the rules.
+**It holds the deploy keys.** An agent with credentials can approve its own release. That is one prompt injection away from a self-inflicted outage.
+
+These are coordination problems, not model problems. The fix is to put the agent in the same room as the people and let the room enforce the rules.
 
 ## What Switch gives you
 
-Switch is open source infrastructure for putting AI agents into team chat. The parts Vigil leans on:
+Switch is open-source infrastructure for putting AI agents into team chat. The parts Vigil depends on:
 
-- **Rooms.** Every channel in Slack, Discord, Telegram or Mattermost becomes a room: an append-only log with instructions, roles, documents and participants. Humans and agents read the same log.
-- **The agent protocol.** One WebSocket for events in, HTTP for operations out. Any client that speaks it can join a room, no matter what framework built it.
-- **Templates.** A YAML file that provisions rooms, agents, roles, documents, aliases and a kickoff message in one pass.
-- **Roles.** Named jobs with instructions. Exclusive roles have a single holder at a time, which is exactly what you want for "who is incident commander right now".
-- **Room documents.** Structured artifacts stored on the Switch server with authorship enforced: an agent can only change what it created.
-- **Room links.** Directed edges between rooms, so an agent can ask "where does this work go next" instead of hardcoding channel IDs.
+- **Rooms.** A room is an append-only log with instructions, roles, documents and participants, bridged to a channel in your chat app (Vigil's live deployment uses Mattermost; Switch also bridges Slack, Discord and Telegram). People and agents read the same log.
+- **The agent protocol.** One WebSocket for events in, HTTP operations out. Any client that speaks it can join a room, whatever framework built it.
+- **Templates.** One YAML file that creates rooms, roles, documents, links and a kickoff message in one pass.
+- **Roles.** Named jobs with instructions. An exclusive role has one holder at a time, which is exactly what "who is incident commander right now" needs.
+- **Room documents.** Structured documents stored on the Switch server, with authorship enforced: an agent can only change what it created.
+- **Room links.** Directed edges between rooms, so an agent can ask "where does this work go next" instead of hard-coding channel IDs.
 
-## Mapping the incident lifecycle onto three linked rooms
+## Three linked rooms
 
 Vigil's template creates three rooms and links them in a cycle.
 
-1. `#vigil-incidents`. The sentinel agent receives the 5xx webhook from the checkout service, correlates it to the suspect commit, claims the exclusive `incident-commander` lease, writes a `blast-radius-dossier` room document, and follows the room link to the hotfix room.
-2. `#vigil-hotfix`. The patcher reproduces the fault against the live API with the exact payload from the dossier, stages a candidate, runs a regression matrix, writes `patch-verification-report`, and follows the next link.
-3. `#vigil-releases`. The release gate posts the candidate for review and waits. Only a human reply of `approve INC-2041 promote` or `approve INC-2041 rollback` changes production. After promotion it runs five synthetic canary probes, writes the postmortem document, and follows the last link back to close the incident.
+1. **`#vigil-incidents`.** The sentinel agent receives the service's 5xx alert, matches it to the suspect commit, claims the exclusive `incident-commander` role, writes a `blast-radius-dossier` room document, and follows the link to the hotfix room.
+2. **`#vigil-hotfix`.** A patch author writes the fix: Vigil's own patcher, or your coding agent. Vigil's patcher then checks it: it reproduces the failure on the live service, runs the service's real test suite, boots the candidate on a staging port and replays the failing request. It writes `patch-verification-report` and follows the next link.
+3. **`#vigil-releases`.** The release gate posts the candidate and waits. Only a person typing `approve INC-2041 promote` or `approve INC-2041 rollback` in chat changes production. After a deploy it runs five live canary probes, writes the postmortem, and follows the last link back to close the incident.
 
-Two honest notes about the demo environment. The checkout service is small and purpose-built, but it is a real Node/TypeScript process that Vigil runs from a git-backed working copy. The three regressions (a zero-decimal currency crash, a stacked-promo negative charge, and an inventory lock leak) are real patch files committed and deployed with a restart, so the "production" being protected is a stand-in only in the sense that nobody's revenue depends on it. And for a zero-setup run, Vigil boots an embedded Switch server that implements the published protocol: registration, the WebSocket connection, ping and pong, roles, documents, links and the operations catalog. Mode B points the same agents at a real Switch server (we run switch-core 0.31.0 with Mattermost at vigil-switch.netlayerlabs.com), which is where the approval happens in actual chat.
+An honest note about the target: the checkout service is small and purpose-built, but it is a real Node/TypeScript process that Vigil runs from a git working copy. Its three regressions (a zero-decimal currency crash, a stacked-promo negative charge and an inventory lock leak) are real commits deployed with a restart. The "production" is a stand-in only in the sense that nobody's revenue depends on it.
 
-## Four things we think nobody else will have
+## A real run: Claude Code fixes a live bug
 
-### 1. Claude Code as the patch author, Vigil as the verifier
+On Nov 6, 2026, the live deployment ran on a self-hosted Switch server (switch-core 0.31.0) with Mattermost. A Claude Code session ran on the same host as its own unprivileged user and was bound into `#vigil-hotfix` through Switch Console as `@claude-code`, with the repository's `CLAUDE.md` as its brief.
 
-The hackathon brief says "take an agent you already use". So in external mode Vigil's own patcher stops writing fixes. Switch Console binds a local Claude Code session into `#vigil-hotfix`, the repo's `CLAUDE.md` briefs it, and the sentinel's escalation addresses it as `patch-author`. Vigil's patcher takes the `red-team-verifier` role instead.
+- **17:32 UTC.** A visitor shipped the JPY regression. JPY checkouts started returning HTTP 500. The service raised its own alert, and the incident opened as `INC-2044`.
+- The sentinel took `incident-commander`, wrote the dossier, opened a `#hotfix-INC-2044` workroom, and mentioned `@claude-code` in `#vigil-hotfix` with the failing request and the path to the live working copy.
+- **Claude Code** reproduced the 500, traced it to the regression commit, and wrote a 12-line forward fix in `src/cartPricing.ts`: JPY and KRW restored at scale 1, and the `Partial` type and `!` assertions removed, so a missing currency is now a compile error instead of a crash at checkout. It replied `@vigil-patcher verify INC-2044`.
+- **Vigil's patcher** committed the change as the candidate and passed all seven checks: the diff applies, the JPY failure no longer reproduces on staging, and the service's five pricing tests pass. It told `#vigil-releases` the fix was written by `claude-code`.
+- **A person** typed `@vigil-release-gate approve INC-2044 promote` in Mattermost. The gate returned `APPROVED_PROMOTE`, restarted the service on the verified commit, and all five canary probes passed.
+- **17:47 UTC.** `INC-2044` closed on `v2.14.1-hotfix`, fifteen minutes after it opened.
 
-Claude Code reproduces the fault, writes the fix, and hands the unified diff back in the room inside a ```` ```diff ```` fence addressed to the verifier (or over `POST /api/incidents/INC-xxxx/stage-patch`). The verifier applies the change, reproduces the failure on the live service, runs the service's real tests, replays the failing request on a staging copy, and writes the report. A diff that does not actually carry the fix fails the matrix and never reaches the release room. We tested this with a cosmetic one-line diff: it was rejected with a `422` and the incident stayed in the hotfix stage.
+Earlier the same day, an approval posted by the `vigil-patcher` agent itself was refused with `REJECTED_AGENT_SENDER`. The agent can write and check code; it cannot ship it.
 
-### 2. Release policy that lives in a Switch room document
+## Four ideas worth borrowing
 
-The gate's limits used to be constants in code. Now they live in the `release-safety-policy` room document that the template creates:
+### 1. Your coding agent writes the fix; another agent checks it
 
-```yaml
-- name: "release-safety-policy"
-  description: "The rules the release gate checks before shipping"
-  instructions: "Enforced on every production deployment or rollback."
-  content: |
-    # Release policy
-    ...
-    ## Settings
-    People change these from chat, for example `@{team}-release-gate set max diff 60`. The gate reads them again on every approval.
-    - max_changed_lines: 40
-    - forbidden_paths: .env, secret, auth-keys, migrations/drop
-    - require_green_matrix: true
-    - allowed_approvers: any-human
-    - min_canary_probes: 5
+The hackathon brief says to take an agent you already use. In Vigil's external mode, Vigil's own patcher stops writing fixes. Switch Console binds Claude Code into `#vigil-hotfix`, the sentinel's escalation hands it the `patch-author` role, and Vigil's patcher takes `red-team-verifier` instead.
+
+Claude Code can hand off three ways: edit the working copy and post `@vigil-patcher verify INC-xxxx`, post a unified diff in a diff code block, or call `POST /api/incidents/INC-xxxx/stage-patch`. Whichever it picks, the verifier commits the candidate and runs the same checks. A change that does not carry the fix never reaches the release room: a diff that applies cleanly but only adds a notes file is rejected with `422`, and the incident stays in the hotfix room.
+
+### 2. Release policy that lives in a room document
+
+The gate's limits are not constants in code. They live in a `release-safety-policy` room document:
+
+```
+# Release policy
+The release gate checks these rules on every approval. It is plain code; no model decides.
+...
+## Settings
+People change these from chat, for example `@vigil-release-gate set max diff 60`.
+- max_changed_lines: 40
+- forbidden_paths: .env, secret, auth-keys, migrations/drop
+- require_green_matrix: true
+- allowed_approvers: any-human
+- min_canary_probes: 5
 ```
 
-The gate loads that document on every approval and parses its Settings block. Humans change it from chat with a small grammar:
+The gate re-reads that document on every approval. People change it from chat with a small grammar: `set max diff 60`, `set approvers priya,sam`, `set forbidden paths .env,secret`, `set green matrix on|off`, `set canary probes 3`.
 
-```ts
-/**
- * Parse a chat policy-change command. Grammar (case-insensitive):
- *   set max diff 60 | set max_changed_lines 60
- *   set approvers priya,sam | set approvers any
- *   set forbidden paths .env,secret | set forbidden paths none
- *   set green matrix on|off
- *   set canary probes 3
- */
-```
-
-When Priya types `set max diff 1`, the gate rewrites the document with `update_room_document` and the next `approve` of the 12-line candidate is rejected with `REJECTED_DIFF_POLICY_VIOLATION`. When she types `set approvers sam`, her own approval is refused and Sam's goes through. When an agent tries the same command, it is blocked as an agent sender. Governance moves into the room, and the question "would this stop working without Switch" answers itself.
+When Priya types `set max diff 1`, the gate rewrites the document with `update_room_document`, and the next approval of the 12-line fix is rejected with `REJECTED_DIFF_POLICY_VIOLATION`. When she types `set approvers sam`, her own approval is refused and Sam's goes through. When an agent sends the same command, it is refused as an agent. The rules live in the room, so taking Switch away takes the rules with it.
 
 ### 3. Incident commander failover
 
-Exclusive roles and connection fencing exist for the moment the commander's process dies mid-incident. Vigil demos exactly that. A chaos button wedges the live sentinel: its socket stays open but it stops answering pings. A standby sentinel then reopens the same `connection_id` from the last acknowledged cursor. The server evicts the wedged socket with `evicted: taken_over`, which the old client treats as final, the new generation resumes the event stream without a gap, and the standby re-asserts the `incident-commander` lease. The incident then completes through the new commander, and the closure callback lands on the standby, not the ghost.
+Exclusive roles and connection fencing exist for the moment the commander's process dies mid-incident. Vigil's test suite and its offline preview demonstrate exactly that. A chaos button wedges the sentinel: its socket stays open but it stops answering pings. A standby sentinel reopens the same `connection_id` from the last acknowledged cursor. The server evicts the wedged socket with `evicted: taken_over`, which the old client treats as final. The new generation resumes the event stream without a gap and re-asserts the `incident-commander` role, and the incident completes under the new commander.
 
-### 4. Ephemeral per-incident workrooms
+### 4. A throwaway workroom per incident
 
-Rooms can be lifecycle objects, not just static channels. For each incident the sentinel instantiates `vigil-hotfix-workroom.template.yaml` (through `create_room_from_yaml` on a real Switch server), giving `#hotfix-inc-2041` its own `patch-author` and `release-gatekeeper` roles and the stack trace in its instructions. It links the workroom from `#vigil-hotfix` with `link_rooms`, posts the template's kickoff, and the verifier posts its red/blue verdict there. At closure the sentinel archives it with `archive_room`. Durable artifacts stay in the three permanent rooms; the scratch space goes away.
+Rooms can be lifecycle objects, not just static channels. For each incident the sentinel creates `#hotfix-INC-xxxx` from a second template (with `create_room_from_yaml` on a real Switch server), with its own `patch-author` and `release-gatekeeper` roles and the stack trace in its instructions. It links the workroom from `#vigil-hotfix` with `link_rooms`, the verifier posts its verdict there, and the sentinel archives it with `archive_room` when the incident closes. Durable records stay in the three permanent rooms; the scratch space goes away.
 
 ## What we learned about the protocol
 
-**Answer every ping synchronously, before any event work.** The server pings every two seconds with a six-second TTL. A handler that does slow work on the same code path will get the connection evicted. Vigil's client replies first and dispatches second:
+**Answer every ping first.** The server pings every few seconds and evicts a connection that stops answering. A handler that does slow work on the same code path gets its connection dropped. Vigil's client replies before it does anything else:
 
 ```ts
-// 1. LIVENESS FIRST: Answer every `ping` synchronously before any slow event work!
+// Answer every `ping` synchronously, before any slow event work.
 if ('type' in parsed && parsed.type === 'ping') {
-  const pong: SwitchPongFrame = { type: 'pong', cursor: this.cursor };
-  if (socket.readyState === WebSocket.OPEN) {
-    socket.send(JSON.stringify(pong));
-  }
+  const pong = { type: 'pong', cursor: this.cursor };
+  if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(pong));
   return;
 }
 ```
 
-**Act only when `payload.addressed` is true.** By default a connection receives every message in its rooms. If three agents each react to every line, you get a feedback loop. The client drops unaddressed messages before any handler runs.
+**Act only when `addressed` is true.** By default a connection receives every message in its rooms. If three agents each react to every line, you get a feedback loop. Drop unaddressed messages before any handler runs.
 
-**A new agent answers only its owner.** This one cost us a debugging session. A freshly registered agent refuses messages from other agents and from teammates who are not its owner. Call `update_agent_detail` with an `addressing` value after registration, or the sentinel-to-patcher handoff silently gets a refusal reply.
+**A new agent answers only its owner.** A freshly registered agent refuses messages from other agents and from teammates who are not its owner. Widen it with `update_agent_detail` and an `addressing` value. On switch-core an agent may not change its own setting, but it may change a sibling agent with the same owner, so Vigil's sentinel opens up the patcher and the gate, and the patcher opens up the sentinel.
 
-**`taken_over` is final.** If a client reconnects after being taken over, it steals the connection back and the two clients fight forever. The client sets a permanent stop flag on that eviction code and never reconnects.
+**`taken_over` is final.** If a client reconnects after being taken over, it steals the connection back and the two clients fight forever. Set a permanent stop flag on that eviction and never reconnect.
 
-**Document authorship.** On a real Switch server only the agent that created a room document can edit or delete it, and a document created by a template has no agent author at all, so no agent can change it. We learned this when policy edits from chat could not be saved to a template-created `release-safety-policy`. Now the release gate creates the policy document itself at startup, which makes it the owner, and the template only seeds the read-only runbooks. Give every document that an agent must rewrite to that agent.
+**Give each document to the agent that edits it.** On a real Switch server only the agent that created a room document can edit or delete it, and a document created by a template has no agent author, so no agent can change it. We found this when policy edits from chat could not be saved. Now the release gate creates the policy document at startup, which makes it the owner.
 
-## Reproduce it
+**Read the real server's frames, not just the docs.** First contact with switch-core needed a few client changes: control frames arrive as `{event, data}`, operations act on the room the connection last joined with `connect_to_room`, and some argument names differ. Rooms are created from YAML with `create_room_from_yaml`. Test against a real server early.
+
+## Try it
+
+**Live:** open https://vigil.netlayerlabs.com/app, ship the JPY chaos release, and watch the sentinel take command in rooms that belong to a real Switch server. Press **Test Rogue Agent Block** while a fix waits for approval to see the gate refuse an agent. The page cannot approve anything; only a person in the chat app can.
+
+**On your machine (offline preview):**
 
 ```bash
 git clone https://github.com/NetLayerLabs/Vigil.git
 cd Vigil
 npm install
-npm test
+npm test          # 19 tests
 npm run build
-npm start
+npm start         # http://localhost:4010
 ```
 
-Open `http://localhost:4010`, click **Open the War Room**, inject a chaos release, set the patch author to the external coder, paste a diff into the intake, tighten the policy from the chat bar, crash and fail over the sentinel, then approve as Priya and watch the canary probes and the postmortem land. The test suite covers every one of those paths.
+This boots an embedded server that speaks the Switch protocol, so the whole loop runs on one machine with test identities standing in for people. Open the War Room, ship a chaos release, try a bad diff, tighten the policy from the chat bar, crash and fail over the sentinel, then approve and watch the canaries and the postmortem land.
 
-The repo: https://github.com/NetLayerLabs/Vigil
+**With your own Switch server:** run Switch Console or Switch's Docker Compose stack with a chat bridge, create a registration key, run `npm run onboard:switch`, then `npm start`. Vigil creates the three linked rooms itself. Bind your coding agent to `#vigil-hotfix` and approve from your chat app. The README has the details.
+
+Code: https://github.com/NetLayerLabs/Vigil
