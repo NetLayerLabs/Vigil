@@ -394,13 +394,15 @@ room:
 
     const before = runtime.coordinator.sentinelClient;
     const beforeGen = before.getGeneration();
-    const beforeCursor = before.getCursor();
-    expect(beforeCursor).toBeGreaterThan(0);
 
     // Wedge the commander mid-incident: socket open, pings unanswered
     const crash = (await (await post('/api/chaos/crash-sentinel')).json()) as { hung: { generation: number } };
     expect(crash.hung.generation).toBe(beforeGen);
     expect(before.isHung()).toBe(true);
+    // A hung client stops advancing its cursor, so read it now: room traffic may still have been
+    // arriving right up to the crash.
+    const beforeCursor = before.getCursor();
+    expect(beforeCursor).toBeGreaterThan(0);
     const leaseBefore = (await runtime.coordinator.releaseGateClient.getRoomDetail(incidentsRoomId)).roles.find(
       (r) => r.name === 'incident-commander',
     );
