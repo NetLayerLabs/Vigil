@@ -147,6 +147,8 @@ interface WireTrace {
 
 interface ObservatorySnapshot {
   mode: string;
+  /** Live Switch server: the messaging app's team URL, where humans approve (`/channels/<room>`). */
+  chatUrl?: string | null;
   switchServerUrl: string;
   checkoutBaseUrl: string;
   checkoutRepo: { workDir: string; log: Array<{ sha: string; author: string; message: string; at: number }> };
@@ -422,6 +424,10 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
   const degraded = telemetry.status !== 'healthy';
   const busy = busyAction !== null;
   const gateInc = activeInc && activeInc.stage === 'awaiting_human_gate' ? activeInc : null;
+  // On a live Switch server, humans speak (and approve) in the messaging app, not on this page.
+  const isLive = snap.mode !== 'embedded_switch_protocol_server';
+  const chatChannelUrl = (roomName: string): string | null =>
+    snap.chatUrl ? `${snap.chatUrl.replace(/\/+$/, '')}/channels/${roomName.toLowerCase()}` : null;
   const gateMatrix = gateInc?.patchVerification?.testMatrix ?? [];
   const pv = latestInc?.patchVerification ?? null;
   const policy = snap.releasePolicy;
@@ -449,7 +455,7 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
             <b>War room</b>
           </span>
           <span className="wr-tag">
-            {snap.mode === 'embedded_switch_protocol_server' ? 'Embedded Switch server' : 'Switch Console · live'}
+            {snap.mode === 'embedded_switch_protocol_server' ? 'Embedded Switch server' : 'Live Switch server'}
           </span>
         </div>
 
@@ -624,30 +630,45 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
               <ShieldAlert className="wr-ic" />
               <span>Test Rogue Agent Block</span>
             </button>
-            <button
-              type="button"
-              className="wr-btn wr-btn--lg wr-btn--ondark"
-              onClick={async () => {
-                setSelectedRoomId(snap.roomIds.releasesRoomId);
-                await postChatMessage(snap.roomIds.releasesRoomId, `@vigil-release-gate approve ${gateInc.incidentId} rollback`);
-              }}
-            >
-              <RotateCcw className="wr-ic" />
-              <span>Rollback to v2.13.2</span>
-            </button>
-            <button
-              type="button"
-              className="wr-btn wr-btn--lg wr-btn--brand"
-              onClick={async () => {
-                setSelectedRoomId(snap.roomIds.releasesRoomId);
-                setMobileView('room');
-                await postChatMessage(snap.roomIds.releasesRoomId, `@vigil-release-gate approve ${gateInc.incidentId} promote`);
-                setRightTab('patch');
-              }}
-            >
-              <UserCheck className="wr-ic" />
-              <span>Approve &amp; Promote as Priya</span>
-            </button>
+            {isLive ? (
+              <a
+                className="wr-btn wr-btn--lg wr-btn--brand"
+                href={chatChannelUrl('vigil-releases') ?? undefined}
+                target="_blank"
+                rel="noreferrer"
+                title={`Reply "@vigil-release-gate approve ${gateInc.incidentId} promote" (or rollback) in #vigil-releases`}
+              >
+                <UserCheck className="wr-ic" />
+                <span>Approve in Mattermost</span>
+              </a>
+            ) : (
+              <>
+              <button
+                type="button"
+                className="wr-btn wr-btn--lg wr-btn--ondark"
+                onClick={async () => {
+                  setSelectedRoomId(snap.roomIds.releasesRoomId);
+                  await postChatMessage(snap.roomIds.releasesRoomId, `@vigil-release-gate approve ${gateInc.incidentId} rollback`);
+                }}
+              >
+                <RotateCcw className="wr-ic" />
+                <span>Rollback to v2.13.2</span>
+              </button>
+              <button
+                type="button"
+                className="wr-btn wr-btn--lg wr-btn--brand"
+                onClick={async () => {
+                  setSelectedRoomId(snap.roomIds.releasesRoomId);
+                  setMobileView('room');
+                  await postChatMessage(snap.roomIds.releasesRoomId, `@vigil-release-gate approve ${gateInc.incidentId} promote`);
+                  setRightTab('patch');
+                }}
+              >
+                <UserCheck className="wr-ic" />
+                <span>Approve &amp; Promote as Priya</span>
+              </button>
+              </>
+            )}
           </div>
         </section>
       )}
@@ -910,6 +931,20 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
                 <div ref={messagesEndRef} />
               </div>
 
+              {isLive ? (
+                <div className="wr-compose wr-compose--live">
+                  <p>
+                    This room is mirrored to Mattermost. Humans post and approve there, so the server knows who
+                    said it. Reply <code>@vigil-release-gate approve INC-xxxx promote</code> in #vigil-releases.
+                  </p>
+                  {chatChannelUrl(currentRoom.name) && (
+                    <a className="wr-btn wr-btn--dark" href={chatChannelUrl(currentRoom.name) ?? undefined} target="_blank" rel="noreferrer">
+                      <Send className="wr-ic" />
+                      <span>Open #{currentRoom.name} in Mattermost</span>
+                    </a>
+                  )}
+                </div>
+              ) : (
               <form onSubmit={handleSendChat} className="wr-compose">
                 <div className="wr-quick">
                   <span className="wr-label">Try</span>
@@ -977,6 +1012,7 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
                   </button>
                 </div>
               </form>
+              )}
             </>
           )}
         </section>
