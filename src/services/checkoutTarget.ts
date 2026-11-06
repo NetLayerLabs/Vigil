@@ -102,7 +102,15 @@ export interface RepoCommit {
 }
 
 /** The guarded service, from its target manifest (VIGIL_TARGET, default targets/checkout-api.target.json). */
-export const TARGET = loadTargetManifest();
+export const TARGET = (() => {
+  try {
+    return loadTargetManifest();
+  } catch (err) {
+    // A bad manifest is a configuration error: say which field, without a stack trace.
+    console.error(`Vigil cannot start: ${(err as Error).message}`);
+    process.exit(1);
+  }
+})();
 export const LAST_KNOWN_GOOD_VERSION = TARGET.versions.lastKnownGood;
 export const REGRESSION_VERSION = 'v2.14.0';
 export const HOTFIX_VERSION = TARGET.versions.hotfix;
@@ -127,7 +135,7 @@ export const FAULT_CATALOG: Record<
 > = {
   jpy_zero_decimal_500: {
     title: 'v2.14.0 Zero-Decimal Currency Crash (JPY/KRW)',
-    commitAuthor: 'Alex Rivera <alex@team.dev>',
+    commitAuthor: 'Alex Rivera (seeded) <alex@example.com>',
     commitMessage: 'refactor(pricing): migrate to shared ISO-4217 scale table (zero-decimal synced lazily)',
     patchFile: 'jpy_zero_decimal_500.patch',
     reproPayload: {
@@ -141,7 +149,7 @@ export const FAULT_CATALOG: Record<
   },
   promo_negative_ledger_500: {
     title: 'v2.14.0 Stacked Promo Negative Capture Crash',
-    commitAuthor: 'Sam Okafor <sam@team.dev>',
+    commitAuthor: 'Sam Okafor (seeded) <sam@example.com>',
     commitMessage: 'feat(promos): honour every submitted coupon in order (marketing PR-4412)',
     patchFile: 'promo_negative_ledger_500.patch',
     reproPayload: {
@@ -155,7 +163,7 @@ export const FAULT_CATALOG: Record<
   },
   inventory_lock_leak_503: {
     title: 'v2.14.0 Inventory Semaphore Leak on Fraud Decline (503 Cascade)',
-    commitAuthor: 'Alex Rivera <alex@team.dev>',
+    commitAuthor: 'Alex Rivera (seeded) <alex@example.com>',
     commitMessage: 'perf(locks): screen fraud before the pricing block so declined carts skip tax computation',
     patchFile: 'inventory_lock_leak_503.patch',
     reproPayload: {
@@ -246,6 +254,18 @@ export class LiveCheckoutTarget {
     if (!this.explicitWorkDir && port !== 0) {
       this.workDir = path.resolve(process.cwd(), '.vigil-state', `${TARGET.name}-live-${port}`);
     }
+    this.ephemeralWorkDir = !this.explicitWorkDir && port === 0;
+    // If Vigil exits for any reason, the service it started must not keep running on its own.
+    if (!this.exitHook) {
+      this.exitHook = () => {
+        try {
+          this.child?.kill('SIGKILL');
+        } catch {
+          // already gone
+        }
+      };
+      process.on('exit', this.exitHook);
+    }
     await this.prepareRepo();
     await this.startAlertCollector();
     this.boundPort = port === 0 ? await findFreePort() : port;
@@ -268,7 +288,16 @@ export class LiveCheckoutTarget {
       await new Promise<void>((r) => this.alertServer!.close(() => r()));
       this.alertServer = null;
     }
+    if (this.exitHook) {
+      process.off('exit', this.exitHook);
+      this.exitHook = null;
+    }
+    // Throwaway runs (ephemeral port) leave nothing behind in .vigil-state.
+    if (this.ephemeralWorkDir) rmSync(this.workDir, { recursive: true, force: true });
   }
+
+  private exitHook: (() => void) | null = null;
+  private ephemeralWorkDir = false;
 
   private async prepareRepo(): Promise<void> {
     rmSync(this.workDir, { recursive: true, force: true });
@@ -304,7 +333,7 @@ export class LiveCheckoutTarget {
 
     await this.git(['init', '-q', '-b', 'main']);
     await this.git(['add', '-A']);
-    await this.gitCommit(`release: ${LAST_KNOWN_GOOD_VERSION} ${TARGET.name} (last known good)`, 'Release Bot <release-bot@team.dev>');
+    await this.gitCommit(`release: ${LAST_KNOWN_GOOD_VERSION} ${TARGET.name} (last known good)`, 'Release Bot (seeded) <release-bot@example.com>');
     await this.git(['tag', LAST_KNOWN_GOOD_VERSION]);
     await this.shareWorkingCopy();
   }
@@ -488,6 +517,8 @@ export class LiveCheckoutTarget {
       windowRequests: this.cachedMetrics.windowRequests,
       status: this.cachedMetrics.status,
       workDir: this.workDir,
+      /** False when the target has no metrics endpoint: error rate, p99 and request counts are not measured. */
+      metricsMeasured: Boolean(TARGET.metricsPath),
     };
   }
 
@@ -608,6 +639,11 @@ export class LiveCheckoutTarget {
           ? 'inventory_lock_leak_503'
           : 'promo_negative_ledger_500');
 
+    // Whatever the alert does not report comes from the service's own measurements, never a default.
+    await this.pollMetrics();
+    const measured = this.cachedMetrics;
+    const name = raw.errorName?.trim();
+    const message = raw.errorMessage.trim();
     this.incidentSequence += 1;
     const alert: IncidentAlertWebhook = {
       incidentId: `INC-${this.incidentSequence}`,
@@ -623,10 +659,12 @@ export class LiveCheckoutTarget {
         line: where.line,
       },
       endpoint: raw.endpoint ?? `${TARGET.endpoint.method} ${TARGET.endpoint.path}`,
-      httpStatus: raw.httpStatus ?? 500,
-      errorRatePct: raw.metrics?.errorRatePct ?? 0,
-      p99LatencyMs: Math.round((raw.metrics?.p99LatencyMs ?? 0) * 10) / 10,
-      errorMessage: `${raw.errorName ?? 'Error'}: ${raw.errorMessage}`,
+      // 0 means the alert did not say; messages then read 'is failing' instead of naming a status
+      httpStatus: raw.httpStatus ?? 0,
+      errorRatePct: raw.metrics?.errorRatePct ?? measured.errorRatePct,
+      p99LatencyMs: Math.round((raw.metrics?.p99LatencyMs ?? measured.p99LatencyMs) * 10) / 10,
+      // Monitoring tools often already lead with the error name; do not repeat it.
+      errorMessage: name && !message.startsWith(`${name}:`) ? `${name}: ${message}` : message,
       stackTrace: raw.stackTrace ?? '',
       reproductionPayload: (raw.reproductionPayload as CheckoutRequest) ?? FAULT_CATALOG[scenarioId].reproPayload,
       detectedAt: raw.detectedAt ?? Date.now(),
@@ -683,9 +721,23 @@ export class LiveCheckoutTarget {
       let detail = passed ? 'passed' : 'failed';
       if (!passed) {
         for (let j = i + 1; j < Math.min(lines.length, i + 30); j++) {
-          const em = lines[j].match(/^\s+(?:error|failureType|message):\s*['"]?(.+?)['"]?\s*$/);
-          if (em && /error|message/.test(lines[j])) {
-            detail = em[1].replace(/\\n/g, ' ').slice(0, 160);
+          const em = lines[j].match(/^(\s+)(?:error|message):\s*['"]?(.*?)['"]?\s*$/);
+          if (!em) continue;
+          let text = em[2];
+          if (/^[|>][-+]?$/.test(text) || text === '') {
+            // YAML block scalar: the message is on the following, more indented lines
+            const indent = em[1].length;
+            const block: string[] = [];
+            for (let k = j + 1; k < Math.min(lines.length, j + 12); k++) {
+              const lead = lines[k].match(/^\s*/)?.[0].length ?? 0;
+              if (lines[k].trim() === '') continue;
+              if (lead <= indent) break;
+              block.push(lines[k].trim());
+            }
+            text = block.join(' ');
+          }
+          if (text) {
+            detail = text.replace(/\\n/g, ' ').replace(/\s+/g, ' ').slice(0, 200);
             break;
           }
         }
@@ -706,7 +758,7 @@ export class LiveCheckoutTarget {
   /** Boot the candidate commit on an ephemeral staging port and replay the production repro payload. */
   private async stagingProbe(scenarioId: FaultScenarioId): Promise<{ passed: boolean; detail: string }> {
     const spec = FAULT_CATALOG[scenarioId];
-    const port = 20000 + Math.floor(Math.random() * 20000);
+    const port = await findFreePort();
     const start = resolveCommand(TARGET.start);
     const child = spawn(start.cmd, start.args, {
       cwd: this.workDir,
@@ -886,7 +938,7 @@ export class LiveCheckoutTarget {
     const safeAuthor = submission.author.replace(/[<>]/g, '').trim() || 'external-coder';
     await this.gitCommit(
       `hotfix(${incidentId}): candidate from ${safeAuthor} -> ${HOTFIX_VERSION}`,
-      `${safeAuthor} <${safeAuthor.toLowerCase().replace(/[^a-z0-9]+/g, '-')}@switch.local>`,
+      `${safeAuthor} <${safeAuthor.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'external-coder'}@switch.local>`,
     );
 
     return this.finishVerification(incidentId, scenarioId, repro, baseRef, submission.author, 'external-coder', [
@@ -898,7 +950,8 @@ export class LiveCheckoutTarget {
   public async getReferenceFixDiff(): Promise<string> {
     const sha = this.deployedRegression?.sha;
     if (!sha) return '';
-    return this.git(['diff', '--no-color', sha, `${sha}~1`, '--', 'src']);
+    const diff = await this.git(['diff', '--no-color', sha, `${sha}~1`, '--', 'src']);
+    return diff ? `${diff}\n` : '';
   }
 
   // ------------------------------------------------------------------ release (real)
@@ -914,11 +967,17 @@ export class LiveCheckoutTarget {
     await this.restartService();
     const sha = await this.headSha();
     const canaryReport = await this.runSyntheticCanaryProbes();
-    if (canaryReport.healthy) {
-      this.stagedCandidate = null;
-      this.deployedRegression = null;
-    }
     return { deployedVersion: this.cachedMetrics.deployedVersion, canaryReport, sha };
+  }
+
+  /**
+   * The release gate closed the incident: the candidate and the regression it fixed are settled. Until
+   * then (canaries short of the policy) the candidate stays staged, so a person can ship it again or
+   * roll back.
+   */
+  public settleRelease(): void {
+    this.stagedCandidate = null;
+    this.deployedRegression = null;
   }
 
   public async runSyntheticCanaryProbes(): Promise<CanaryProbeReport> {
