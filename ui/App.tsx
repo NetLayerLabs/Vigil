@@ -1463,8 +1463,8 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
                 <span className="wr-label">templates/vigil-war-room.template.yaml</span>
                 <h2>Switch group template</h2>
                 <p>
-                  Import into Switch Console under Templates to provision the three linked rooms, roles, documents and agents
-                  in Mattermost, Discord, Telegram or Slack.
+                  The three linked rooms with their roles, documents and agents. On a real Switch server Vigil creates them
+                  from this template on first start; they show up in whichever chat app the server bridges.
                 </p>
               </div>
               <div>
