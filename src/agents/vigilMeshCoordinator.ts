@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { SwitchAgentClient } from '../protocol/switchClient.js';
 import { ProtocolWireTrace, SwitchRoomDetail } from '../protocol/types.js';
@@ -44,7 +44,9 @@ export type IncidentLifecycleStage =
   | 'reproducing_patching'
   | 'awaiting_human_gate'
   | 'resolved_promoted'
-  | 'resolved_rolled_back';
+  | 'resolved_rolled_back'
+  /** Still open when Vigil restarted: the target was rebuilt from the last known good release. */
+  | 'interrupted';
 
 export interface IncidentLedgerRecord {
   incidentId: string;
@@ -74,6 +76,12 @@ export interface VigilMeshOptions {
   /** `auto`: Vigil's patcher writes the fix. `external`: a coding agent bound via Switch Console (e.g. Claude Code) does; Vigil verifies. */
   patchMode?: PatchMode;
   checkoutService: CheckoutMicroservice;
+  /**
+   * Keep the incident ledger and the policy audit in this JSON file across restarts. Incidents still
+   * open at startup are marked `interrupted`, because the target restarts from the last known good
+   * release and their regression is gone.
+   */
+  ledgerFile?: string;
   preRegisteredCreds?: {
     sentinel?: { id: string; api_key: string };
     patcher?: { id: string; api_key: string };
@@ -120,9 +128,58 @@ export class VigilMeshCoordinator {
   private retiredSentinels: SwitchAgentClient[] = [];
 
   constructor(opts: VigilMeshOptions) {
-    this.opts = opts;
+    // Every state change already notifies; saving the ledger rides on the same signal.
+    const notify = opts.onEventUpdate;
+    this.opts = {
+      ...opts,
+      onEventUpdate: () => {
+        notify?.();
+        this.schedulePersist();
+      },
+    };
     this.teamPrefix = opts.teamPrefix ?? 'vigil';
     this.patchMode = opts.patchMode ?? (opts.externalCoderHandle ? 'external' : 'auto');
+    this.loadLedger();
+  }
+
+  private persistTimer: NodeJS.Timeout | null = null;
+
+  private loadLedger(): void {
+    const file = this.opts.ledgerFile;
+    if (!file || !existsSync(file)) return;
+    const saved = JSON.parse(readFileSync(file, 'utf8')) as {
+      incidents?: IncidentLedgerRecord[];
+      policyAudit?: PolicyAuditEntry[];
+    };
+    let lastNumber = 0;
+    for (const record of saved.incidents ?? []) {
+      if (!record.stage.startsWith('resolved') && record.stage !== 'interrupted') {
+        record.stage = 'interrupted';
+        record.resolvedAt = Date.now();
+      }
+      this.incidents.set(record.incidentId, record);
+      lastNumber = Math.max(lastNumber, Number(/^INC-(\d+)$/.exec(record.incidentId)?.[1] ?? 0));
+    }
+    this.policyAudit.push(...(saved.policyAudit ?? []));
+    if (lastNumber > 0) this.opts.checkoutService.seedIncidentSequence(lastNumber);
+  }
+
+  /** Write the ledger at most every 300 ms, atomically (temp file, then rename). */
+  private schedulePersist(): void {
+    const file = this.opts.ledgerFile;
+    if (!file || this.persistTimer) return;
+    this.persistTimer = setTimeout(() => {
+      this.persistTimer = null;
+      try {
+        mkdirSync(path.dirname(file), { recursive: true });
+        const tmp = `${file}.tmp`;
+        const incidents = this.getIncidents().slice(0, 200);
+        writeFileSync(tmp, JSON.stringify({ savedAt: Date.now(), incidents, policyAudit: this.policyAudit.slice(-500) }));
+        renameSync(tmp, file);
+      } catch (err) {
+        console.error('[vigil] could not save the incident ledger:', (err as Error).message);
+      }
+    }, 300);
   }
 
   public getPatchMode(): PatchMode {

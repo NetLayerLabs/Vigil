@@ -114,6 +114,7 @@ export async function startVigilRuntime(opts: {
     preRegisteredCreds,
     // The embedded server is provisioned over HTTP; a real Switch server through `create_room_from_yaml`.
     provisionTemplateViaApi: Boolean(embeddedSwitch),
+    ledgerFile: process.env.VIGIL_LEDGER_FILE?.trim() || undefined,
     onEventUpdate: () => broadcastState(),
   });
 
