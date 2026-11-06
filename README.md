@@ -31,6 +31,8 @@ Built for the [Flip the Switch Hackathon](https://www.wemakedevs.org/hackathons/
 | **Bring your own coding agent** | [`CLAUDE.md`](CLAUDE.md) briefs Claude Code, Codex, Cursor, OpenCode or Antigravity as the `patch-author`: reproduce with `curl`, edit the live working copy, run the tests, hand off by `verify INC-xxxx`, a diff fence in chat, or `POST /api/incidents/INC-xxxx/stage-patch`. | [`CLAUDE.md`](CLAUDE.md) |
 | **Switch group template** | One YAML file provisions the three rooms, three agents, exclusive roles, room documents, a service reference and directed links in Switch Console. | **Switch template** button in `/app` · [`templates/vigil-war-room.template.yaml`](templates/vigil-war-room.template.yaml) |
 | **Protocol inspector** | Every WebSocket frame and operation call the agents make: `connection_state`, `ping`/`pong` cursors, `message`, and `POST /ops/*` with `X-Switch-Connection-Id`. | **Protocol** view in `/app` |
+| **Alerts from your monitoring** | Prometheus Alertmanager, Sentry (with its webhook signature) or any JSON source can raise the incident, instead of the service's own alert. | `POST /api/webhooks/{alertmanager,sentry,generic}` |
+| **Guard your own service** | A target manifest describes the service: a folder or git URL, its release tags, start and test commands, health check, endpoint, traffic and canaries. | [`targets/README.md`](targets/README.md) |
 
 The app has two pages. `/` is the landing page, which reads live status from `/api/state` (deployed version, error rate, p99 latency, agents online, the policy currently in force, and the real `git log`). `/app` is the War Room: rooms and agents on the left, the selected room's log in the middle, and documents, protocol frames and patch evidence on the right. Every page works on phones: at 900px and below the left rail becomes a drawer, and a Room / Docs / Protocol / Patch switcher shows one view at a time while the sign-off bar stays on screen.
 
@@ -288,7 +290,9 @@ Later that day a public visitor shipped **03 Inventory Lock Leak 503** as `INC-2
 - **Rollback is always available.** A human can `approve INC-xxxx rollback` at any time; it resets to the `v2.13.2` tag and restarts.
 - **Canaries after every release.** Five live probes (USD, EUR, JPY, KRW, and a USD promo cart) must return `200 OK` before the incident closes.
 - **The external coder is fenced.** [`CLAUDE.md`](CLAUDE.md) caps diffs, forbids `.env`, keys, migrations and deployment state, and tells the agent it cannot hold `release-gatekeeper`. The gate enforces the same limits regardless of what the agent does.
-- **Tests:** 7 of 7 Vitest integration tests and 5 of 5 service tests pass (see [Run it](#run-it-locally)).
+- **The public site cannot steer Vigil.** With `VIGIL_OPERATOR_KEY` set, visitors can watch, ship one chaos release at a time (at most one every 30 seconds) and run the rogue-agent test. Patch mode, patch staging, sentinel crash and failover need the key. Monitoring tools use their own `VIGIL_ALERT_TOKEN`.
+- **Candidate code runs unprivileged.** The service, its tests and the staging copy get a minimal environment with none of Vigil's keys. With `VIGIL_SERVICE_USER` set, they run as that user. On the live server, Claude Code also runs as its own user, `vigil-coder`, which can edit only the service's working copy ([`scripts/setup-coder-user.sh`](scripts/setup-coder-user.sh)).
+- **Tests:** 12 of 12 Vitest tests and 5 of 5 service tests pass (see [Run it](#run-it-locally)).
 
 ## What's real and what's seeded
 
@@ -336,6 +340,12 @@ For development, `npm run dev` runs the server from source with `tsx`, and `npm 
 | `VIGIL_PATCH_MODE` | `auto` (Vigil's patcher writes the fix) or `external` (your coding agent does). Also switchable at runtime. |
 | `CHECKOUT_TRAFFIC_INTERVAL_MS` (default `250`, `0` disables) | Milliseconds between synthetic checkout requests. |
 | `VIGIL_CHAT_URL` | Mode B: the messaging app's team URL (for example `https://vigil-chat.netlayerlabs.com/vigil`). The War Room links each room to `<url>/channels/<room>`, because humans post and approve there. |
+| `VIGIL_TARGET` (default `targets/checkout-api.target.json`) | The target manifest: which service Vigil guards. See [`targets/README.md`](targets/README.md). |
+| `VIGIL_OPERATOR_KEY` | For a public deployment. Operator controls need this key (the War Room's **Operator key** button); requests made on the host itself don't. Unset: everything is open. |
+| `VIGIL_ALERT_TOKEN`, `VIGIL_SENTRY_CLIENT_SECRET` | Let monitoring tools post to `/api/webhooks/*`, with the token as a Bearer header or `?token=`, or with Sentry's signature. |
+| `VIGIL_SELF_ALERTS` (default `on`) | `off` stops the service raising its own alert, so your monitoring tool is the trigger. |
+| `VIGIL_SERVICE_USER`, `VIGIL_SHARED_GROUP` | Run the service, tests and staging as an unprivileged user, and make the working copy group-writable for an external coder's own user. |
+| `VIGIL_LEDGER_FILE` | Keep incidents and the policy audit in this JSON file across restarts. Incidents still open at a restart become `interrupted`. |
 
 The full list with comments is in [`.env.example`](.env.example). Two scripts help outside the UI: `npm run inject:fault jpy_zero_decimal_500` ships a bad release from a terminal, and `npm run onboard:switch` registers the agents in Mode B.
 
