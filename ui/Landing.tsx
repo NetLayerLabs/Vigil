@@ -293,7 +293,7 @@ export function Landing({ onLaunch }: { onLaunch: () => void }) {
             <span className="vl-rise is-in" style={{ ['--d' as string]: '0.78s' }}>
               Vigil runs a production incident across three linked Switch rooms. A sentinel opens it, a patcher
               (Vigil's own, or Claude Code) writes and tests the fix, and the release gate waits for a person to
-              type <strong>approve</strong> in Mattermost, Discord, Telegram or Slack.
+              type <strong>approve</strong> in the team's chat app.
             </span>
           </p>
 

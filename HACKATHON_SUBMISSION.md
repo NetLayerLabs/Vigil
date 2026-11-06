@@ -13,7 +13,7 @@
 - **Code:** https://github.com/NetLayerLabs/Vigil
 
 ## Tagline (One Line)
-Turn SEV-1 production outages into an auditable, multi-room team workflow in Mattermost, Discord, Telegram, or Slack — combining Switch WebSocket protocol agents, CLI coding agents, exclusive role leases, room documents, and a deterministic human release gate.
+Turn SEV-1 production outages into an auditable, multi-room team workflow in the team's chat app (Mattermost on the live deployment) — combining Switch WebSocket protocol agents, CLI coding agents, exclusive role leases, room documents, and a deterministic human release gate.
 
 ## How Switch Is Central (Would Stop Working Without Switch)
 1. **Multi-Room Group Template (`templates/vigil-war-room.template.yaml`):** Provisions `#vigil-incidents`, `#vigil-hotfix`, and `#vigil-releases` with directed room links, exclusive roles (`incident-commander`, `patch-author`, `release-gatekeeper`), room-scoped documents, and service references in a single pass.
@@ -41,7 +41,7 @@ Turn SEV-1 production outages into an auditable, multi-room team workflow in Mat
 
 > Just built **Vigil** for the Flip the Switch Hackathon by @WeMakeDevs_ & Switch AI.
 >
-> Instead of debugging outages in isolated terminals, Vigil wires 3 linked Switch Rooms (`#incidents` -> `#hotfix` -> `#releases`) directly into Mattermost/Discord:
+> Instead of debugging outages in isolated terminals, Vigil wires 3 linked Switch Rooms (`#incidents` -> `#hotfix` -> `#releases`) directly into Mattermost:
 > - `vigil-sentinel` correlates 500 stack traces & claims the exclusive `incident-commander` role lease
 > - `vigil-patcher` (or your Claude Code) fixes the bug; Vigil reproduces it, runs the real tests and replays the failing request before anyone is asked
 > - `vigil-release-gate` refuses agent approvals and waits for a person in chat, then deploys, runs canary probes and writes the postmortem

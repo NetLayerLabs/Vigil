@@ -2,13 +2,20 @@
 
 **Vigil runs a production outage across three linked Switch rooms: agents find and fix the bug, and only a human can ship the fix.**
 
-When a release breaks checkout, `@vigil-sentinel` takes command in `#vigil-incidents`, a patcher (Vigil's own, or your Claude Code session) writes the fix in `#vigil-hotfix`, and `@vigil-release-gate` waits in `#vigil-releases` until a teammate types `approve INC-2041 promote` in Mattermost, Discord, Telegram or Slack. Everything is measured by one rule: **no change reaches production unless the real test suite is green, the failing request now succeeds on staging, and a human said yes.**
+When a release breaks checkout, `@vigil-sentinel` takes command in `#vigil-incidents`, a patcher (Vigil's own, or your Claude Code session) writes the fix in `#vigil-hotfix`, and `@vigil-release-gate` waits in `#vigil-releases` until a teammate types `approve INC-2041 promote` in the team's chat app (Mattermost on the live deployment; Switch also bridges Slack, Discord and Telegram). Everything is measured by one rule: **no change reaches production unless the real test suite is green, the failing request now succeeds on staging, and a human said yes.**
 
 Built for the [Flip the Switch Hackathon](https://www.wemakedevs.org/hackathons/switch) (WeMakeDevs x Switch, Track 01: Best Business Workflow) · Live: [vigil.netlayerlabs.com](https://vigil.netlayerlabs.com), on a real Switch server · Local: [Run it](#run-it-locally) · Demo: `<VIDEO_URL>` · Code: [github.com/NetLayerLabs/Vigil](https://github.com/NetLayerLabs/Vigil)
 
-**Judges, start here:** `npm install && npm run build && npm start`, open [localhost:4010](http://localhost:4010) and press **Open the War Room**. No accounts, keys or Docker are needed: Vigil boots its own Switch protocol server and a real checkout service. Click **01 JPY Zero-Decimal 500**, wait about 5 seconds for the dark sign-off bar, then click **Approve & Promote as Priya**. The whole incident takes under a minute.
+**Judges, start here: the live deployment.** [vigil.netlayerlabs.com/app](https://vigil.netlayerlabs.com/app) runs on a real Switch server (switch-core 0.31.0, self-hosted at `vigil-switch.netlayerlabs.com`) with Mattermost as the team's chat app. Vigil's three agents and a Claude Code session are all agents on that server. Vigil created `#vigil-incidents`, `#vigil-hotfix` and `#vigil-releases` there from [a room template](templates/vigil-war-room.template.yaml), and Claude Code, bound through Switch Console, sits in `#vigil-hotfix` as the patch author.
 
-**Or watch it live:** [vigil.netlayerlabs.com/app](https://vigil.netlayerlabs.com/app) runs the same agents against a real Switch server (0.31.0) with Mattermost. Ship a chaos release there and the rooms, roles and documents you see are the server's own. On the live site the page cannot approve anything: a human approves in Mattermost, and **Test Rogue Agent Block** posts a real approval from the patcher agent so you can watch the gate refuse it.
+On Nov 6, 2026 (UTC) that is how `INC-2044` was fixed: a JPY checkout started failing with HTTP 500, the sentinel took command and sent the failing request to `#vigil-hotfix`, **Claude Code wrote the 12-line fix** in the service's working copy, Vigil's patcher checked it independently (7 of 7 checks: the service's own tests plus a replay of the failing request on staging), and a person approved it by typing `@vigil-release-gate approve INC-2044 promote` in Mattermost. All five canary probes passed and the incident closed 15 minutes after it opened. Details in [What's real and what's seeded](#whats-real-and-whats-seeded).
+
+On the live site you can:
+1. Ship a chaos release (**01 JPY Zero-Decimal 500**) and watch the sentinel take the `incident-commander` role, write its room document and open a per-incident workroom. The rooms, roles and documents you see are the Switch server's own.
+2. Press **Test Rogue Agent Block** while a fix waits for approval: the patcher agent posts a real approval in `#vigil-releases`, and the gate refuses it with `REJECTED_AGENT_SENDER`.
+3. Try to approve from the page: it can't. Only a person in the chat app can ship.
+
+**Offline preview.** To look at the loop on one machine without a Switch server: `npm install && npm run build && npm start`, open [localhost:4010](http://localhost:4010) and press **Open the War Room**. Vigil then boots an embedded server that speaks the Switch protocol, and two test identities stand in for people. It is a stand-in for development and review; approving from chat and handing the fix to your own coding agent need a real Switch server ([setup](#using-it-with-a-real-switch-server)). Click **01 JPY Zero-Decimal 500**, wait about 5 seconds for the sign-off bar, then click **Approve & Promote as Priya**.
 
 ---
 
@@ -43,7 +50,7 @@ Take Switch away and Vigil has no place to work, no way to hand off, and no one 
 - **No rooms, no workflow.** Triage, fix and release are three Switch rooms joined by directed links. Agents find the next room with `list_linked_rooms`; no channel ID is hard-coded (`src/agents/vigilMeshCoordinator.ts`).
 - **No role leases, no command.** `incident-commander`, `patch-author` and `release-gatekeeper` are exclusive `assume_role` leases. A second claimant gets `409` until `release_role`, so two agents can never ship at once (`src/mock-switch/switchServerHarness.ts`, test *role leases*).
 - **No room documents, no policy.** The gate reads its rules from the `release-safety-policy` document on every decision, and Switch's document authorship check stops one agent overwriting another's report (`403`). See `src/gate/releaseSafetyGate.ts`.
-- **No bridged chat, no human.** Approval is a chat message from a person on the room's chat bridge (or one the server marks `sender_kind: user`), so the person who signs off is in Mattermost, Discord, Telegram or Slack, not in Vigil's UI.
+- **No bridged chat, no human.** Approval is a chat message from a person on the room's chat bridge (or one the server marks `sender_kind: user`), so the person who signs off is in the team's chat app (Mattermost on the live deployment), not in Vigil's UI.
 - **No generation fencing, no failover.** Commander takeover relies on Switch's `connection_state` generations, `start_from` cursors and the final `evicted: taken_over` frame (`src/protocol/switchClient.ts`).
 
 ## Architecture
@@ -65,7 +72,7 @@ flowchart LR
   end
 
   subgraph Chat["Chat bridges"]
-    MM["Mattermost, Discord,<br/>Telegram, Slack"]
+    MM["Mattermost (live)<br/>or another Switch bridge"]
   end
 
   subgraph Switch["Switch server"]
@@ -282,6 +289,7 @@ On Nov 6, 2026 (UTC), the same incident ran against a real Switch server (switch
 
 Later that day a public visitor shipped **03 Inventory Lock Leak 503** as `INC-2043`. The patcher reverted the bad commit (8 changed lines, 6/6 checks green), and a human typed `@vigil-release-gate approve INC-2043 promote` in Mattermost as `priya`. The gate returned `APPROVED_PROMOTE` for that Mattermost user, restarted `checkout-api` from the verified commit (`baf2907`, tagged `v2.14.1-hotfix`), and all five canary probes answered `200 OK` (worst 4 ms). It wrote `postmortem-inc-2043`, posted the closure in `#vigil-incidents`, and archived `#hotfix-INC-2043`. Error rate returned to 0%.
 
+
 ## Safety
 
 - **Agents cannot approve.** The gate fails closed: a sender counts as a person only when the server marks it `user`, or when its participant id belongs to a person (a chat-bridge user, or a test identity in Mode A). Agents, Switch itself, unknown ids, and anyone whose handle or display name matches an agent's are refused with `REJECTED_AGENT_SENDER`. Approvers named in the policy are matched on their chat handle, not a display name they could change (`src/gate/releaseSafetyGate.ts`, `tests/releaseSafety.test.ts`).
@@ -317,6 +325,8 @@ Later that day a public visitor shipped **03 Inventory Lock Leak 503** as `INC-2
 Node.js 26.5 (the version tested) · TypeScript 5.9 · `ws` 8.22 for WebSockets · `yaml` 2 for templates · React 18.3 + Vite 6.4 + Tailwind 3.4 for the UI, with Inter and Geist Mono · Vitest 2.1 and `node:test` for tests · `tsx` 4 to run TypeScript · git for every change to the target service. No LLM is called at runtime; the gate is plain code.
 
 ## Run it locally
+
+This is the offline preview: an embedded server that speaks the Switch protocol stands in for Switch, so the loop runs on one machine. For approvals from chat and your own coding agent, connect a real Switch server ([below](#using-it-with-a-real-switch-server)).
 
 **Prerequisites:** Node.js (tested on 26.5; the service runs with `node --import tsx`, which needs 20.6 or newer), npm, and git on your `PATH`. Ports `4010` and `4020` free, or set your own.
 
