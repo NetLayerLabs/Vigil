@@ -50,6 +50,8 @@ export interface SwitchMessagePayload {
   addressed: boolean;
   sender: string;
   sender_name: string;
+  /** switch-core: "user" (a human on a bridge), "agent", or "platform". */
+  sender_kind?: string | null;
   message_id: string;
   body: string;
   timestamp: number;
