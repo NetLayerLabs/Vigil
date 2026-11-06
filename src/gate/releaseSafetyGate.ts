@@ -10,6 +10,8 @@ export interface ReleaseApprovalAttempt {
   knownAgentParticipantIds: Set<string>;
   knownAgentNames: Set<string>;
   patchVerification: PatchVerificationResult | null;
+  /** The release a rollback returns to (from the incident's alert). */
+  lastKnownGoodVersion?: string;
   /** Policy read from the `release-safety-policy` Switch room document at evaluation time. */
   policy?: ReleasePolicy;
 }
@@ -140,7 +142,7 @@ export class ReleaseSafetyGate {
   }
 
   /** Render the human-readable + machine-readable policy document body. */
-  public static renderPolicyDocument(policy: ReleasePolicy, changedBy?: string): string {
+  public static renderPolicyDocument(policy: ReleasePolicy, changedBy?: string, team = 'vigil'): string {
     return [
       '# Release policy',
       'The release gate checks these rules on every approval. It is plain code; no model decides.',
@@ -152,7 +154,7 @@ export class ReleaseSafetyGate {
       '- A fix may change only so many lines, and never touch the protected paths below.',
       '',
       '## Settings',
-      'People change these from chat, for example `@vigil-release-gate set max diff 60`. The gate reads them again on every approval.',
+      `People change these from chat, for example \`@${team}-release-gate set max diff 60\`. The gate reads them again on every approval.`,
       `- max_changed_lines: ${policy.maxChangedLines}`,
       `- forbidden_paths: ${policy.forbiddenPaths.length ? policy.forbiddenPaths.join(', ') : 'none'}`,
       `- require_green_matrix: ${policy.requireGreenMatrix}`,
@@ -216,13 +218,17 @@ export class ReleaseSafetyGate {
     // Invariant 1: Block AI agent self-approvals & prompt-injected agent senders!
     const lowerSenderId = attempt.senderParticipantId.toLowerCase();
     const lowerSenderName = attempt.senderName.toLowerCase();
-    // Bare handle inside the participant id, e.g. `@switch-user-vigil-patcher:switch.local` -> `vigil-patcher`
-    const senderHandle = lowerSenderId.match(/^@switch-(?:user|agent)-([^:\s]+)/)?.[1] ?? '';
+    // Handle inside the participant id: `@switch-user-priya:switch.local` (embedded server) or
+    // `@switch-mattermost-<bridge uuid>-priya:localhost` (a person on a real server's chat bridge).
+    const senderHandle = handleFromParticipantId(lowerSenderId);
     // Display name with any trailing qualifier stripped, e.g. `vigil-patcher (Rogue Agent Test)` -> `vigil-patcher`
     const senderNameStem = lowerSenderName.replace(/\s*[([].*$/, '').trim();
+    // Fail closed: without the server saying `user`, only participant ids of people count as people.
+    const looksHuman = attempt.senderKind === 'user' || (attempt.senderKind == null && HUMAN_PARTICIPANT.test(lowerSenderId));
     const isAgentSender =
       // The server's own word wins: anything it does not mark as a human user cannot approve.
       (attempt.senderKind != null && attempt.senderKind !== 'user') ||
+      !looksHuman ||
       lowerSenderId.startsWith('@switch-agent-') ||
       attempt.knownAgentParticipantIds.has(attempt.senderParticipantId) ||
       attempt.knownAgentNames.has(lowerSenderName) ||
@@ -264,10 +270,10 @@ export class ReleaseSafetyGate {
 
     // Invariant 3b: Approver allow-list from the room-document policy (`allowed_approvers`)
     if (!policy.allowedApprovers.includes('any-human')) {
-      const handle = (lowerSenderId.match(/^@switch-user-([^:\s]+)/)?.[1] ?? senderNameStem).toLowerCase();
-      const permitted = policy.allowedApprovers.some(
-        (a) => a === handle || a === lowerSenderName || a === senderNameStem,
-      );
+      // Match the chat handle in the participant id when there is one: a display name can be changed.
+      const permitted = senderHandle
+        ? policy.allowedApprovers.includes(senderHandle)
+        : policy.allowedApprovers.some((a) => a === lowerSenderName || a === senderNameStem);
       if (!permitted) {
         return {
           allowed: false,
@@ -286,19 +292,20 @@ export class ReleaseSafetyGate {
         action: 'rollback',
         incidentIdCited: parsed.incidentId,
         reasonCode: 'APPROVED_ROLLBACK',
-        explanation: `Human operator '${attempt.senderName}' authorized immediate rollback of ${parsed.incidentId} to last-known-good v2.13.2.`,
+        explanation: `${attempt.senderName} approved rolling ${parsed.incidentId} back to the last good release${attempt.lastKnownGoodVersion ? ` ${attempt.lastKnownGoodVersion}` : ''}.`,
       };
     }
 
-    // Invariant 4: Promoting a hotfix requires confirmed reproduction + 100% green test matrix
+    // Invariant 4: Promoting needs a confirmed reproduction, a candidate commit that is still staged
+    // (a failed candidate is discarded, so there is nothing to ship), and a green matrix when required.
     const v = attempt.patchVerification;
-    if (!v || !v.reproConfirmed || (policy.requireGreenMatrix && !v.allPassed)) {
+    if (!v || !v.reproConfirmed || !v.candidateSha || (policy.requireGreenMatrix && !v.allPassed)) {
       return {
         allowed: false,
         action: 'promote',
         incidentIdCited: parsed.incidentId,
         reasonCode: 'REJECTED_UNVERIFIED_PATCH',
-        explanation: `Cannot promote candidate patch for ${parsed.incidentId}: reproduction or regression verification matrix is incomplete/failing. Use \`rollback\` if immediate mitigation is needed.`,
+        explanation: `There is no verified fix to ship for ${parsed.incidentId}: ${!v ? 'nothing has been staged yet' : !v.reproConfirmed ? 'the failure was not reproduced' : !v.candidateSha ? 'the last candidate failed its checks and was discarded' : 'its checks did not all pass'}. Use \`rollback\` to go back to the last good release.`,
       };
     }
 
@@ -323,7 +330,19 @@ export class ReleaseSafetyGate {
       action: 'promote',
       incidentIdCited: parsed.incidentId,
       reasonCode: 'APPROVED_PROMOTE',
-      explanation: `Human operator '${attempt.senderName}' approved verified hotfix ${v.candidateVersion} authored by ${v.author} (${v.changedLines} lines, ${v.testMatrix.length}/${v.testMatrix.length} green checks, policy max ${policy.maxChangedLines}) for ${parsed.incidentId}.`,
+      explanation: `${attempt.senderName} approved ${v.candidateVersion} by ${v.author} for ${parsed.incidentId}: ${v.changedLines} changed lines (policy max ${policy.maxChangedLines}), ${v.testMatrix.filter((t) => t.passed).length} of ${v.testMatrix.length} checks passed.`,
     };
   }
+}
+
+/** Participant ids of people: the embedded server's users, a real server's admin, and people on a chat bridge. */
+const HUMAN_PARTICIPANT = /^@switch-(?:user-|admin:|admin$|(?:mattermost|slack|discord|telegram|teams)-)/;
+
+/** The chat handle inside a participant id, or '' when the id has none. */
+export function handleFromParticipantId(lowerId: string): string {
+  return (
+    lowerId.match(/^@switch-(?:user|agent)-([^:\s]+)/)?.[1] ??
+    lowerId.match(/^@switch-[a-z]+-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-([^:\s]+)/)?.[1] ??
+    ''
+  );
 }
