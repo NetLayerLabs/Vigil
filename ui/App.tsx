@@ -51,6 +51,8 @@ interface RoomMessage {
   message_id: string;
   sender: string;
   sender_name: string;
+  /** Live server: `user`, `agent` or `platform`. */
+  sender_kind?: string | null;
   body: string;
   timestamp: number;
   room_id: string;
@@ -913,18 +915,22 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
                   </div>
                 )}
                 {currentRoom.messages.map((m) => {
-                  const isAgent = m.sender.startsWith('@switch-agent-');
+                  // A live server says who sent it: `user` (a person), `agent`, or `platform` (Switch itself,
+                  // e.g. a template kickoff posted on an agent's behalf). Without it, judge by the id.
+                  const kind = m.sender_kind ?? (m.sender.startsWith('@switch-agent-') ? 'agent' : 'user');
+                  const isAgent = kind === 'agent';
+                  const isHuman = kind === 'user';
                   return (
-                    <article key={m.message_id} className={`wr-msg ${isAgent ? '' : 'wr-msg--human'}`}>
+                    <article key={m.message_id} className={`wr-msg ${isHuman ? 'wr-msg--human' : ''}`}>
                       <div className="wr-msg-head">
-                        <span className={`wr-tag ${isAgent ? 'wr-tag--ink' : 'wr-tag--brand'}`}>
-                          {isAgent ? 'Agent' : 'Human'}
+                        <span className={`wr-tag ${isAgent ? 'wr-tag--ink' : isHuman ? 'wr-tag--brand' : ''}`}>
+                          {isAgent ? 'Agent' : isHuman ? 'Human' : 'Switch'}
                         </span>
                         <span className="wr-msg-name">{m.sender_name}</span>
                         <span className="wr-msg-handle">{m.sender}</span>
-                        <span className="wr-msg-seq">#{m.seq}</span>
+                        {m.seq > 0 && <span className="wr-msg-seq">#{m.seq}</span>}
                       </div>
-                      <pre>{m.body}</pre>
+                      <MessageBody text={m.body} />
                     </article>
                   );
                 })}
@@ -1380,6 +1386,59 @@ const FAULTS = [
   { id: 'promo_negative_ledger_500', n: '02', label: 'Stacked Promo Negative 500', tone: 'warn' },
   { id: 'inventory_lock_leak_503', n: '03', label: 'Inventory Lock Leak 503', tone: 'violet' },
 ] as const;
+
+/**
+ * Chat Markdown as agents write it: **bold**, *italic*, `code`, and "- " bullet lists. Builds React
+ * elements (never raw HTML), so nothing in a message can inject markup.
+ */
+function MessageBody({ text }: { text: string }) {
+  const blocks: Array<{ list: boolean; lines: string[] }> = [];
+  for (const line of text.replace(/\s+$/, '').split('\n')) {
+    const bullet = /^\s*[-*]\s+/.test(line);
+    const last = blocks[blocks.length - 1];
+    if (last && last.list === bullet && (bullet || line.trim() !== '')) last.lines.push(line);
+    else if (line.trim() !== '' || bullet) blocks.push({ list: bullet, lines: [line] });
+  }
+  return (
+    <div className="wr-msg-body">
+      {blocks.map((b, i) =>
+        b.list ? (
+          <ul key={i}>
+            {b.lines.map((l, j) => (
+              <li key={j}>{inlineMarkdown(l.replace(/^\s*[-*]\s+/, ''))}</li>
+            ))}
+          </ul>
+        ) : (
+          <p key={i}>
+            {b.lines.map((l, j) => (
+              <React.Fragment key={j}>
+                {j > 0 && <br />}
+                {inlineMarkdown(l)}
+              </React.Fragment>
+            ))}
+          </p>
+        ),
+      )}
+    </div>
+  );
+}
+
+function inlineMarkdown(line: string): React.ReactNode[] {
+  const out: React.ReactNode[] = [];
+  const re = /(`[^`]+`|\*\*[^*]+\*\*|\*[^*\s][^*]*\*)/g;
+  let at = 0;
+  for (const m of line.matchAll(re)) {
+    const idx = m.index ?? 0;
+    if (idx > at) out.push(line.slice(at, idx));
+    const tok = m[0];
+    if (tok.startsWith('`')) out.push(<code key={idx}>{tok.slice(1, -1)}</code>);
+    else if (tok.startsWith('**')) out.push(<strong key={idx}>{inlineMarkdown(tok.slice(2, -2))}</strong>);
+    else out.push(<em key={idx}>{tok.slice(1, -1)}</em>);
+    at = idx + tok.length;
+  }
+  if (at < line.length) out.push(line.slice(at));
+  return out;
+}
 
 function stageTone(stage: string): string {
   if (stage === 'resolved_promoted') return 'wr-tag--brand';
