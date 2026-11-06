@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto';
 import { createServer, IncomingMessage, ServerResponse } from 'node:http';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
@@ -241,6 +242,8 @@ export async function startVigilRuntime(opts: {
       roomIds: coordinator.getRoomIds(),
       // Live Switch server: humans approve in the messaging app; this is where to send them.
       chatUrl: embeddedSwitch ? null : process.env.VIGIL_CHAT_URL || null,
+      // Public deployments lock the operator controls; the War Room asks for the key.
+      operatorKeyRequired: Boolean(operatorKey),
       patchMode: coordinator.getPatchMode(),
       externalCoderHandle: coordinator.getExternalCoderHandle(),
       releasePolicy: coordinator.getReleasePolicy(),
@@ -272,6 +275,36 @@ export async function startVigilRuntime(opts: {
 
   const uiDistDir = path.resolve(process.cwd(), 'dist/ui');
 
+  // ---- Access control --------------------------------------------------------------------------
+  // With VIGIL_OPERATOR_KEY set (a public deployment), anyone may watch, ship a chaos release and run
+  // the rogue-agent test, but the controls that change how Vigil behaves need the operator key.
+  // Requests made on this machine without a proxy in between (the checkout service's own alert, a
+  // coding agent handing off a patch on localhost) count as the operator. Unset: everything is open.
+  const operatorKey = (process.env.VIGIL_OPERATOR_KEY ?? '').trim();
+  const OPERATOR_ROUTES = [
+    /^\/api\/patch-mode$/,
+    /^\/api\/incidents\/[^/]+\/(stage-patch|reference-fix)$/,
+    /^\/api\/chaos\/(crash|failover)-sentinel$/,
+    /^\/api\/webhooks\//,
+    /^\/api\/operator\/check$/,
+  ];
+  const isDirectLoopback = (req: IncomingMessage): boolean => {
+    const addr = req.socket.remoteAddress ?? '';
+    const loopback = addr === '127.0.0.1' || addr === '::1' || addr === '::ffff:127.0.0.1';
+    return loopback && !req.headers['x-forwarded-for'] && !req.headers['x-real-ip'];
+  };
+  const isOperator = (req: IncomingMessage): boolean => {
+    if (!operatorKey || isDirectLoopback(req)) return true;
+    const auth = String(req.headers.authorization ?? '');
+    const given = auth.startsWith('Bearer ') ? auth.slice(7).trim() : String(req.headers['x-vigil-operator-key'] ?? '');
+    const a = Buffer.from(given);
+    const b = Buffer.from(operatorKey);
+    return a.length === b.length && timingSafeEqual(a, b);
+  };
+  /** Public chaos releases: one open incident at a time, and one release per 30 seconds. */
+  const PUBLIC_CHAOS_COOLDOWN_MS = 30_000;
+  let lastPublicChaosAt = 0;
+
   const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse) => {
     const method = req.method ?? 'GET';
     const url = new URL(req.url ?? '/', 'http://127.0.0.1');
@@ -287,6 +320,16 @@ export async function startVigilRuntime(opts: {
     }
 
     try {
+      if (OPERATOR_ROUTES.some((r) => r.test(url.pathname)) && !isOperator(req)) {
+        sendJson(res, 401, { error: 'This control needs the operator key.', operatorRequired: true });
+        return;
+      }
+
+      if (method === 'GET' && url.pathname === '/api/operator/check') {
+        sendJson(res, 200, { ok: true });
+        return;
+      }
+
       if (method === 'GET' && url.pathname === '/api/state') {
         const snap = await buildObservatorySnapshot();
         sendJson(res, 200, snap);
@@ -316,6 +359,21 @@ export async function startVigilRuntime(opts: {
           sendJson(res, 400, { error: `Unknown scenarioId: ${scenarioId}` });
           return;
         }
+        const open = coordinator.getActiveIncident();
+        if (open && !open.stage.startsWith('resolved')) {
+          sendJson(res, 409, {
+            error: `${open.incidentId} is still open. A human has to promote or roll it back first.`,
+            openIncidentId: open.incidentId,
+          });
+          return;
+        }
+        const operator = isOperator(req);
+        const wait = lastPublicChaosAt + PUBLIC_CHAOS_COOLDOWN_MS - Date.now();
+        if (!operator && wait > 0) {
+          sendJson(res, 429, { error: `One chaos release per 30 seconds. Try again in ${Math.ceil(wait / 1000)}s.` });
+          return;
+        }
+        if (!operator) lastPublicChaosAt = Date.now();
         const alert = await checkoutService.injectFaultRelease(scenarioId);
         broadcastState();
         sendJson(res, 200, { ok: true, alert });
