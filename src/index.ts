@@ -1,4 +1,4 @@
-import { timingSafeEqual } from 'node:crypto';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import { createServer, IncomingMessage, ServerResponse } from 'node:http';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
@@ -7,6 +7,7 @@ import { WebSocket, WebSocketServer } from 'ws';
 import { SwitchServerHarness } from './mock-switch/switchServerHarness.js';
 import { CheckoutMicroservice, FAULT_CATALOG, FaultScenarioId } from './services/checkoutTarget.js';
 import { VigilMeshCoordinator } from './agents/vigilMeshCoordinator.js';
+import { ALERT_PROVIDERS, AlertProvider, normalizeAlert } from './services/alertAdapters.js';
 
 const MIME_TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -285,7 +286,6 @@ export async function startVigilRuntime(opts: {
     /^\/api\/patch-mode$/,
     /^\/api\/incidents\/[^/]+\/(stage-patch|reference-fix)$/,
     /^\/api\/chaos\/(crash|failover)-sentinel$/,
-    /^\/api\/webhooks\//,
     /^\/api\/operator\/check$/,
   ];
   const isDirectLoopback = (req: IncomingMessage): boolean => {
@@ -301,6 +301,29 @@ export async function startVigilRuntime(opts: {
     const b = Buffer.from(operatorKey);
     return a.length === b.length && timingSafeEqual(a, b);
   };
+  // Monitoring tools post alerts with their own token (never the operator key in a URL): as a Bearer
+  // header, or `?token=` for tools that cannot set headers. Sentry can sign instead
+  // (VIGIL_SENTRY_CLIENT_SECRET). Without VIGIL_ALERT_TOKEN, only the operator may post alerts.
+  const alertToken = (process.env.VIGIL_ALERT_TOKEN ?? '').trim();
+  const sentrySecret = (process.env.VIGIL_SENTRY_CLIENT_SECRET ?? '').trim();
+  const sameSecret = (given: string, expected: string): boolean => {
+    const a = Buffer.from(given);
+    const b = Buffer.from(expected);
+    return expected.length > 0 && a.length === b.length && timingSafeEqual(a, b);
+  };
+  const mayPostAlert = (req: IncomingMessage, url: URL, provider: string, rawBody: string): boolean => {
+    if (isOperator(req)) return true;
+    const auth = String(req.headers.authorization ?? '');
+    const given = auth.startsWith('Bearer ') ? auth.slice(7).trim() : (url.searchParams.get('token') ?? '');
+    if (alertToken && sameSecret(given, alertToken)) return true;
+    if (provider === 'sentry' && sentrySecret) {
+      const signature = String(req.headers['sentry-hook-signature'] ?? '');
+      const expected = createHmac('sha256', sentrySecret).update(rawBody, 'utf8').digest('hex');
+      return sameSecret(signature, expected);
+    }
+    return false;
+  };
+
   /** Public chaos releases: one open incident at a time, and one release per 30 seconds. */
   const PUBLIC_CHAOS_COOLDOWN_MS = 30_000;
   let lastPublicChaosAt = 0;
@@ -454,11 +477,39 @@ export async function startVigilRuntime(opts: {
 
       // Real alert webhook endpoint (the service posts to the target's own collector by default;
       // this route lets an external monitoring stack raise incidents too).
-      if (method === 'POST' && url.pathname === '/api/webhooks/checkout-alert') {
-        const body = (await readJson(req)) as Parameters<typeof checkoutService.handleAlertWebhook>[0];
-        const alert = await checkoutService.handleAlertWebhook(body);
+      // Alerts from monitoring tools: /api/webhooks/{alertmanager,sentry,generic}. The service's own
+      // alert shape is still accepted at /api/webhooks/checkout-alert.
+      const hookMatch = url.pathname.match(/^\/api\/webhooks\/([a-z-]+)$/);
+      if (method === 'POST' && hookMatch) {
+        const provider = hookMatch[1];
+        const known = provider === 'checkout-alert' || (ALERT_PROVIDERS as readonly string[]).includes(provider);
+        if (!known) {
+          sendJson(res, 404, { error: `Unknown alert source '${provider}'. Use one of: ${ALERT_PROVIDERS.join(', ')}.` });
+          return;
+        }
+        const rawBody = await readRawBody(req);
+        if (!mayPostAlert(req, url, provider, rawBody)) {
+          sendJson(res, 401, { error: 'Alert webhooks need the alert token (Bearer header or ?token=).' });
+          return;
+        }
+        let body: unknown;
+        try {
+          body = rawBody ? JSON.parse(rawBody) : {};
+        } catch {
+          sendJson(res, 400, { error: 'Body is not JSON.' });
+          return;
+        }
+        const raw =
+          provider === 'checkout-alert'
+            ? (body as Parameters<typeof checkoutService.handleAlertWebhook>[0])
+            : normalizeAlert(provider as AlertProvider, body, checkoutService.getTelemetry().deployedVersion);
+        if (!raw) {
+          sendJson(res, 200, { accepted: false, reason: 'Nothing to act on (a resolved alert or a test ping).' });
+          return;
+        }
+        const { alert, reason } = await checkoutService.acceptExternalAlert(raw);
         broadcastState();
-        sendJson(res, alert ? 202 : 200, { accepted: Boolean(alert), alert });
+        sendJson(res, alert ? 202 : 200, { accepted: Boolean(alert), incidentId: alert?.incidentId ?? null, reason });
         return;
       }
 
@@ -600,6 +651,12 @@ function sendJson(res: ServerResponse, status: number, body: unknown): void {
     'Access-Control-Allow-Origin': '*',
   });
   res.end(JSON.stringify(body));
+}
+
+async function readRawBody(req: IncomingMessage): Promise<string> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of req) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  return Buffer.concat(chunks).toString('utf8').trim();
 }
 
 async function readJson(req: IncomingMessage): Promise<unknown> {
