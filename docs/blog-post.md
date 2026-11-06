@@ -33,7 +33,7 @@ Vigil's template creates three rooms and links them in a cycle.
 2. `#vigil-hotfix`. The patcher reproduces the fault against the live API with the exact payload from the dossier, stages a candidate, runs a regression matrix, writes `patch-verification-report`, and follows the next link.
 3. `#vigil-releases`. The release gate posts the candidate for review and waits. Only a human reply of `approve INC-2041 promote` or `approve INC-2041 rollback` changes production. After promotion it runs five synthetic canary probes, writes the postmortem document, and follows the last link back to close the incident.
 
-Two honest notes about the demo environment. The checkout service is small and purpose-built, but it is a real Node/TypeScript process that Vigil runs from a git-backed working copy. The three regressions (a zero-decimal currency crash, a stacked-promo negative charge, and an inventory lock leak) are real patch files committed and deployed with a restart, so the "production" being protected is a stand-in only in the sense that nobody's revenue depends on it. And for a zero-setup run, Vigil boots an embedded Switch server that implements the published protocol: registration, the WebSocket connection, ping and pong, roles, documents, links and the operations catalog. Mode B points the same agents at a real Switch Console server with its bundled Mattermost, which is where the approval happens in actual chat.
+Two honest notes about the demo environment. The checkout service is small and purpose-built, but it is a real Node/TypeScript process that Vigil runs from a git-backed working copy. The three regressions (a zero-decimal currency crash, a stacked-promo negative charge, and an inventory lock leak) are real patch files committed and deployed with a restart, so the "production" being protected is a stand-in only in the sense that nobody's revenue depends on it. And for a zero-setup run, Vigil boots an embedded Switch server that implements the published protocol: registration, the WebSocket connection, ping and pong, roles, documents, links and the operations catalog. Mode B points the same agents at a real Switch server (we run switch-core 0.31.0 with Mattermost at vigil-switch.netlayerlabs.com), which is where the approval happens in actual chat.
 
 ## Four things we think nobody else will have
 
@@ -41,7 +41,7 @@ Two honest notes about the demo environment. The checkout service is small and p
 
 The hackathon brief says "take an agent you already use". So in external mode Vigil's own patcher stops writing fixes. Switch Console binds a local Claude Code session into `#vigil-hotfix`, the repo's `CLAUDE.md` briefs it, and the sentinel's escalation addresses it as `patch-author`. Vigil's patcher takes the `red-team-verifier` role instead.
 
-Claude Code reproduces the fault, writes the fix, and hands the unified diff back in the room inside a ```` ```diff ```` fence addressed to the verifier (or over `POST /api/incidents/INC-xxxx/stage-patch`). The verifier reproduces independently, checks the diff for the fault's fix signatures, runs the regression matrix, and writes the report. A diff that does not actually carry the fix fails the matrix and never reaches the release room. We tested this with a cosmetic one-line diff: it was rejected with a `422` and the incident stayed in the hotfix stage.
+Claude Code reproduces the fault, writes the fix, and hands the unified diff back in the room inside a ```` ```diff ```` fence addressed to the verifier (or over `POST /api/incidents/INC-xxxx/stage-patch`). The verifier applies the change, reproduces the failure on the live service, runs the service's real tests, replays the failing request on a staging copy, and writes the report. A diff that does not actually carry the fix fails the matrix and never reaches the release room. We tested this with a cosmetic one-line diff: it was rejected with a `422` and the incident stayed in the hotfix stage.
 
 ### 2. Release policy that lives in a Switch room document
 
@@ -49,13 +49,13 @@ The gate's limits used to be constants in code. Now they live in the `release-sa
 
 ```yaml
 - name: "release-safety-policy"
-  description: "Zero-LLM deterministic release gate invariants"
+  description: "The rules the release gate checks before shipping"
   instructions: "Enforced on every production deployment or rollback."
   content: |
-    # Production Release Gate Policy
+    # Release policy
     ...
-    ## Enforced Parameters
-    Edited from chat by verified humans only (e.g. `@{team}-release-gate set max diff 60`). Re-read by the gate on every evaluation.
+    ## Settings
+    People change these from chat, for example `@{team}-release-gate set max diff 60`. The gate reads them again on every approval.
     - max_changed_lines: 40
     - forbidden_paths: .env, secret, auth-keys, migrations/drop
     - require_green_matrix: true
@@ -63,7 +63,7 @@ The gate's limits used to be constants in code. Now they live in the `release-sa
     - min_canary_probes: 5
 ```
 
-The gate loads that document on every approval and parses the parameters block. Humans change it from chat with a small grammar:
+The gate loads that document on every approval and parses its Settings block. Humans change it from chat with a small grammar:
 
 ```ts
 /**
@@ -76,7 +76,7 @@ The gate loads that document on every approval and parses the parameters block. 
  */
 ```
 
-When Priya types `set max diff 1`, the gate rewrites the document with `update_room_document` and the next `approve` of the 7-line candidate is rejected with `REJECTED_DIFF_POLICY_VIOLATION`. When she types `set approvers sam`, her own approval is refused and Sam's goes through. When an agent tries the same command, it is blocked as an agent sender. Governance moves into the room, and the question "would this stop working without Switch" answers itself.
+When Priya types `set max diff 1`, the gate rewrites the document with `update_room_document` and the next `approve` of the 12-line candidate is rejected with `REJECTED_DIFF_POLICY_VIOLATION`. When she types `set approvers sam`, her own approval is refused and Sam's goes through. When an agent tries the same command, it is blocked as an agent sender. Governance moves into the room, and the question "would this stop working without Switch" answers itself.
 
 ### 3. Incident commander failover
 
@@ -84,7 +84,7 @@ Exclusive roles and connection fencing exist for the moment the commander's proc
 
 ### 4. Ephemeral per-incident workrooms
 
-Rooms can be lifecycle objects, not just static channels. For each incident the sentinel instantiates `vigil-hotfix-workroom.template.yaml` through `create_room`, giving `#hotfix-inc-2041` its own `patch-author` and `release-gatekeeper` roles and the stack trace in its instructions. It links the workroom from `#vigil-hotfix` with `link_rooms`, posts the template's kickoff, and the verifier posts its red/blue verdict there. At closure the sentinel archives it with `archive_room`. Durable artifacts stay in the three permanent rooms; the scratch space goes away.
+Rooms can be lifecycle objects, not just static channels. For each incident the sentinel instantiates `vigil-hotfix-workroom.template.yaml` (through `create_room_from_yaml` on a real Switch server), giving `#hotfix-inc-2041` its own `patch-author` and `release-gatekeeper` roles and the stack trace in its instructions. It links the workroom from `#vigil-hotfix` with `link_rooms`, posts the template's kickoff, and the verifier posts its red/blue verdict there. At closure the sentinel archives it with `archive_room`. Durable artifacts stay in the three permanent rooms; the scratch space goes away.
 
 ## What we learned about the protocol
 
@@ -107,7 +107,7 @@ if ('type' in parsed && parsed.type === 'ping') {
 
 **`taken_over` is final.** If a client reconnects after being taken over, it steals the connection back and the two clients fight forever. The client sets a permanent stop flag on that eviction code and never reconnects.
 
-**Template documents versus authorship.** Documents created by a template have no agent author. The release gate can update the policy document because of that, while a document an agent created can only be changed by that agent. Design your "shared editable" documents to come from the template and your "owned artifacts" to come from agents.
+**Document authorship.** On a real Switch server only the agent that created a room document can edit or delete it, and a document created by a template has no agent author at all, so no agent can change it. We learned this when policy edits from chat could not be saved to a template-created `release-safety-policy`. Now the release gate creates the policy document itself at startup, which makes it the owner, and the template only seeds the read-only runbooks. Give every document that an agent must rewrite to that agent.
 
 ## Reproduce it
 

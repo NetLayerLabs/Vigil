@@ -24,7 +24,7 @@ Each incident gets its own ephemeral workroom, created from a template, linked f
 Nothing ships without a human. The gate deterministically rejects agent self-approvals, then a teammate replies "approve INC-2041 promote" in Mattermost. Five synthetic canary probes, a postmortem document, lease released.
 
 **8/**
-Clone, npm test, npm start, click Open the War Room. Built for @WeMakeDevs_ and @<switch-handle> Track 01.
+Clone, npm test, npm start, click Open the War Room. Built for @WeMakeDevs_ and Switch AI, Track 01.
 https://github.com/NetLayerLabs/Vigil #HowISwitch
 
 ## B. LinkedIn post

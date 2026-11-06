@@ -31,8 +31,8 @@ Built for the [Flip the Switch Hackathon](https://www.wemakedevs.org/hackathons/
 | **Bring your own coding agent** | [`CLAUDE.md`](CLAUDE.md) briefs Claude Code, Codex, Cursor, OpenCode or Antigravity as the `patch-author`: reproduce with `curl`, edit the live working copy, run the tests, hand off by `verify INC-xxxx`, a diff fence in chat, or `POST /api/incidents/INC-xxxx/stage-patch`. | [`CLAUDE.md`](CLAUDE.md) |
 | **Switch group template** | One YAML file provisions the three rooms, three agents, exclusive roles, room documents, a service reference and directed links in Switch Console. | **Switch template** button in `/app` · [`templates/vigil-war-room.template.yaml`](templates/vigil-war-room.template.yaml) |
 | **Protocol inspector** | Every WebSocket frame and operation call the agents make: `connection_state`, `ping`/`pong` cursors, `message`, and `POST /ops/*` with `X-Switch-Connection-Id`. | **Protocol** view in `/app` |
-| **Alerts from your monitoring** | Prometheus Alertmanager, Sentry (with its webhook signature) or any JSON source can raise the incident, instead of the service's own alert. | `POST /api/webhooks/{alertmanager,sentry,generic}` |
-| **Guard your own service** | A target manifest describes the service: a folder or git URL, its release tags, start and test commands, health check, endpoint, traffic and canaries. | [`targets/README.md`](targets/README.md) |
+| **Alerts from your monitoring** | Prometheus Alertmanager, Sentry (with its webhook signature) or any JSON source can raise the incident instead of the service's own alert. An alert opens an incident only while a release Vigil deployed and can trace is live. | `POST /api/webhooks/{alertmanager,sentry,generic}` |
+| **Guard your own service** | A target manifest describes the service: a folder or git URL, its release tags, start and test commands, health check, endpoint, traffic and canaries. Vigil runs, probes, tests, ships and rolls back any service described this way; the chaos releases and the reference fixes stay specific to the demo service. | [`targets/README.md`](targets/README.md) |
 
 The app has two pages. `/` is the landing page, which reads live status from `/api/state` (deployed version, error rate, p99 latency, agents online, the policy currently in force, and the real `git log`). `/app` is the War Room: rooms and agents on the left, the selected room's log in the middle, and documents, protocol frames and patch evidence on the right. Every page works on phones: at 900px and below the left rail becomes a drawer, and a Room / Docs / Protocol / Patch switcher shows one view at a time while the sign-off bar stays on screen.
 
@@ -43,7 +43,7 @@ Take Switch away and Vigil has no place to work, no way to hand off, and no one 
 - **No rooms, no workflow.** Triage, fix and release are three Switch rooms joined by directed links. Agents find the next room with `list_linked_rooms`; no channel ID is hard-coded (`src/agents/vigilMeshCoordinator.ts`).
 - **No role leases, no command.** `incident-commander`, `patch-author` and `release-gatekeeper` are exclusive `assume_role` leases. A second claimant gets `409` until `release_role`, so two agents can never ship at once (`src/mock-switch/switchServerHarness.ts`, test *role leases*).
 - **No room documents, no policy.** The gate reads its rules from the `release-safety-policy` document on every decision, and Switch's document authorship check stops one agent overwriting another's report (`403`). See `src/gate/releaseSafetyGate.ts`.
-- **No bridged chat, no human.** Approval is a chat message the Switch server marks as from a person (`sender_kind: user`), so the person who signs off is in Mattermost, Discord, Telegram or Slack, not in Vigil's UI.
+- **No bridged chat, no human.** Approval is a chat message from a person on the room's chat bridge (or one the server marks `sender_kind: user`), so the person who signs off is in Mattermost, Discord, Telegram or Slack, not in Vigil's UI.
 - **No generation fencing, no failover.** Commander takeover relies on Switch's `connection_state` generations, `start_from` cursors and the final `evicted: taken_over` frame (`src/protocol/switchClient.ts`).
 
 ## Architecture
@@ -124,7 +124,7 @@ flowchart LR
 
 | Identity | Lives in | Can | Can never |
 | --- | --- | --- | --- |
-| Human teammate (`@switch-user-*`) | Chat bridge or the War Room chat bar | Approve `promote` or `rollback` for the active incident, edit the release policy from chat | Promote a candidate whose matrix is red or whose diff breaks the policy |
+| Person (on a chat bridge, or a test identity in Mode A) | Chat app, or the War Room chat bar in Mode A | Approve `promote` or `rollback` for the active incident, edit the release policy from chat | Promote a candidate whose matrix is red or whose diff breaks the policy |
 | `vigil-sentinel` | Vigil runtime | Hold `incident-commander`, write the dossier, open and archive the workroom | Approve a release (`REJECTED_AGENT_SENDER`) |
 | `vigil-patcher` | Vigil runtime | Revert, apply and test candidates, write `patch-verification-report` | Approve a release, edit policy, or skip the test suite |
 | `vigil-release-gate` | Vigil runtime | Restart the service from a verified commit, reset to `v2.13.2`, run canaries | Act without a human command that names the active incident |
@@ -149,7 +149,7 @@ flowchart LR
   K -->|red| M["git reset --hard<br/>discard"]
 ```
 
-The matrix has six rows: the service's five `node --test` cases and the staging replay of the exact request that failed in production. A red candidate is thrown away with `git reset --hard` back to the regression commit, so the next attempt starts clean.
+The matrix has six rows: the service's five `node --test` cases and the staging replay of the exact request that failed in production. A diff from an external coding agent gets a seventh row first: it must apply cleanly. A red candidate is thrown away with `git reset --hard` back to the regression commit, so the next attempt starts clean.
 
 ### One incident, end to end
 
@@ -217,7 +217,7 @@ sequenceDiagram
   R->>GA: approve INC-2041 promote
   GA-->>R: REJECTED_AGENT_SENDER
   H->>GA: set max diff 1
-  GA->>D: update Enforced Parameters
+  GA->>D: update the Settings block
   H->>GA: approve INC-2041 promote
   GA->>D: re-read policy
   GA-->>H: REJECTED_DIFF_POLICY_VIOLATION, 12 lines over 1
@@ -251,7 +251,7 @@ The evicted client treats `taken_over` as final and never reconnects, so two com
 
 ```mermaid
 flowchart LR
-  subgraph Setup["Switch Console setup"]
+  subgraph Setup["Switch server setup"]
     direction LR
     A1["run a Switch server<br/>(Console or Compose)"] --> A2["Mattermost<br/>bridge"] --> A3["create a<br/>registration key"]
   end
@@ -284,15 +284,17 @@ Later that day a public visitor shipped **03 Inventory Lock Leak 503** as `INC-2
 
 ## Safety
 
-- **Agents cannot approve.** The gate rejects any sender the Switch server does not mark as a person (`sender_kind` other than `user`), any sender whose participant ID starts with `@switch-agent-`, whose ID or display name matches a known agent, or whose `@switch-user-*` handle is an agent's name in disguise (`src/gate/releaseSafetyGate.ts`, test *rejects agent handles disguised as human chat senders*).
-- **Policy is data, edited by humans only.** `max_changed_lines` (default 40), `forbidden_paths` (default `.env, secret, auth-keys, migrations/drop`), `require_green_matrix` (default on), `allowed_approvers` (default `any-human`) and `min_canary_probes` (default 5) are parsed from the document's *Enforced Parameters* block. Policy commands from agents are refused and logged.
-- **Nothing ships unverified.** `promote` needs a confirmed reproduction, a green matrix and a diff inside the policy. The candidate is the exact commit that was tested; promote restarts the service from that commit and tags it `v2.14.1-hotfix`.
-- **Rollback is always available.** A human can `approve INC-xxxx rollback` at any time; it resets to the `v2.13.2` tag and restarts.
-- **Canaries after every release.** Five live probes (USD, EUR, JPY, KRW, and a USD promo cart) must return `200 OK` before the incident closes.
+- **Agents cannot approve.** The gate fails closed: a sender counts as a person only when the server marks it `user`, or when its participant id belongs to a person (a chat-bridge user, or a test identity in Mode A). Agents, Switch itself, unknown ids, and anyone whose handle or display name matches an agent's are refused with `REJECTED_AGENT_SENDER`. Approvers named in the policy are matched on their chat handle, not a display name they could change (`src/gate/releaseSafetyGate.ts`, `tests/releaseSafety.test.ts`).
+- **Policy is data, edited by humans only.** `max_changed_lines` (default 40), `forbidden_paths` (default `.env, secret, auth-keys, migrations/drop`), `require_green_matrix` (default on), `allowed_approvers` (default `any-human`) and `min_canary_probes` (default 5) are parsed from the document's *Settings* block. Policy commands from agents are refused and logged.
+- **Nothing ships unverified.** `promote` needs a confirmed reproduction, a candidate commit that is still staged (a failed candidate is discarded, so switching the green-matrix rule off cannot ship it), a green matrix when the policy requires one, and a diff inside the policy. The candidate is the exact commit that was tested; promote restarts the service from that commit and tags it `v2.14.1-hotfix`.
+- **Rollback is always available.** A person can `approve INC-xxxx rollback` at any time; it resets to the last good release tag (`v2.13.2` for the demo) and restarts.
+- **Canaries after every release.** Every probe in the target manifest (for the demo: USD, EUR, JPY, KRW and a USD promo cart) must answer `200`, and at least `min_canary_probes` of them, before the incident closes. If they fall short, the gate says so, the incident stays open, and the fix stays staged so a person can ship it again or roll back. Every closing message reports the real counts.
 - **The external coder is fenced.** [`CLAUDE.md`](CLAUDE.md) caps diffs, forbids `.env`, keys, migrations and deployment state, and tells the agent it cannot hold `release-gatekeeper`. The gate enforces the same limits regardless of what the agent does.
 - **The public site cannot steer Vigil.** With `VIGIL_OPERATOR_KEY` set, visitors can watch, ship one chaos release at a time (at most one every 30 seconds) and run the rogue-agent test. Patch mode, patch staging, sentinel crash and failover need the key. Monitoring tools use their own `VIGIL_ALERT_TOKEN`.
 - **Candidate code runs unprivileged.** The service, its tests and the staging copy get a minimal environment with none of Vigil's keys. With `VIGIL_SERVICE_USER` set, they run as that user. On the live server, Claude Code also runs as its own user, `vigil-coder`, which can edit only the service's working copy ([`scripts/setup-coder-user.sh`](scripts/setup-coder-user.sh)).
-- **Tests:** 12 of 12 Vitest tests and 5 of 5 service tests pass (see [Run it](#run-it-locally)).
+- **The live page cannot speak for anyone.** In Mode B the War Room's only chat action is the rogue-agent test: it posts one fixed approval, under the patcher's own identity, into the releases room, and only while an approval is pending. Monitoring alerts need their token or signature whenever one is configured.
+- **Stopping Vigil stops the service.** `Ctrl-C`, `kill` and process managers stop the guarded service too, so nothing keeps serving an old build on its port.
+- **Tests:** 19 of 19 Vitest tests and 5 of 5 service tests pass (see [Run it](#run-it-locally)).
 
 ## What's real and what's seeded
 
@@ -300,11 +302,11 @@ Later that day a public visitor shipped **03 Inventory Lock Leak 503** as `INC-2
 | --- | --- |
 | `checkout-api`: a Node HTTP service run as a child process, with its own source and `node:test` suite | The three regression patches in `services/checkout-api/releases/` (each written to fail exactly its matching tests) |
 | Git history: regressions, reverts, applied diffs and resets are real commits in `.vigil-state/checkout-api-live-<port>` | Synthetic traffic: a built-in generator sends six kinds of checkout every 250 ms (`CHECKOUT_TRAFFIC_INTERVAL_MS`) |
-| Error rate and p99 latency, measured by the service over a rolling 60-second window | Mode A's Switch server: Vigil's embedded, spec-following protocol server (`src/mock-switch/switchServerHarness.ts`) stands in for Switch Console |
-| The alert webhook the service sends on its first 5xx per version | The people: "Priya" and "Sam" are chat identities you post as from the War Room |
-| Test runs, staging boots, canary probes and process restarts (the `pid` changes on every deploy) | |
-| WebSocket frames, role leases, documents and links between the agents and the Switch server | |
-| Mode B: the live deployment runs switch-core 0.31.0 and Mattermost, where Priya is a real account | |
+| Error rate and p99 latency, measured by the service over a rolling 60-second window (a service without a metrics endpoint shows "—", never a made-up number) | Mode A's Switch server: Vigil's embedded, spec-following protocol server (`src/mock-switch/switchServerHarness.ts`) stands in for a real Switch server |
+| The alert webhook the service sends on its first 5xx per version | The people in Mode A: "Priya" and "Sam" are test identities you post as from the War Room (labelled so in the chat bar) |
+| Test runs, staging boots, canary probes and process restarts (the `pid` changes on every deploy) | The authors of the seeded commits ("Alex Rivera (seeded)", "Sam Okafor (seeded)", "Release Bot (seeded)"), labelled in their names |
+| WebSocket frames, role leases, documents and links between the agents and the Switch server | The starting room documents (`incident-runbook`, `reproduction-playbook`, `release-safety-policy`) and room kickoffs, written by us in the template |
+| Mode B: the live deployment runs switch-core 0.31.0 and Mattermost, where Priya is a real account | The landing page's "How it works" flow and the `#vigil-hotfix` transcript are labelled illustrations, not live captures |
 
 **Verified against a real Switch server (Nov 6, 2026):** agent registration, the WebSocket handshake and heartbeats, room provisioning from the template, role leases, room documents, links, per-incident workrooms, the gate refusing a real agent's approval, a human approval from Mattermost through promotion, canaries, postmortem and workroom archiving (see [A real run](#a-real-run)), and Claude Code writing a fix as the external patch author (below). First contact needed client fixes, now in `src/protocol/switchClient.ts`: control frames arrive as `{event, data}`, operations act on the room the connection last joined with `connect_to_room`, several arguments are named differently, and an agent may not change its own addressing.
 
@@ -322,7 +324,7 @@ Node.js 26.5 (the version tested) · TypeScript 5.9 · `ws` 8.22 for WebSockets 
 git clone https://github.com/NetLayerLabs/Vigil.git
 cd Vigil
 npm install
-npm test           # 7 integration tests, about 6 seconds
+npm test           # 19 tests, about 11 seconds
 npm run build      # server to dist/server, UI to dist/ui
 npm start          # http://localhost:4010 and checkout-api on :4020
 ```
@@ -331,7 +333,7 @@ For development, `npm run dev` runs the server from source with `tsx`, and `npm 
 
 | Variable | What it does |
 | --- | --- |
-| `SWITCH_SERVER_URL` | Empty (default): boot the embedded Switch protocol server (Mode A). Set it to a Switch server URL to connect to Switch Console (Mode B). |
+| `SWITCH_SERVER_URL` | Empty (default): boot the embedded Switch protocol server (Mode A). Set it to a real Switch server's URL (Mode B). |
 | `SWITCH_REGISTRATION_KEY` | A Switch Gateway key of type `registration`, used by `npm run onboard:switch` to create the three agents. |
 | `VIGIL_SENTINEL_AGENT_ID`, `VIGIL_SENTINEL_API_KEY` (and the same pair for `PATCHER` and `RELEASE_GATE`) | Pre-registered agent credentials for Mode B, written by `npm run onboard:switch`. |
 | `VIGIL_TEAM` (default `vigil`) | The prefix for rooms and agents in the template. |
@@ -350,7 +352,7 @@ For development, `npm run dev` runs the server from source with `tsx`, and `npm 
 The full list with comments is in [`.env.example`](.env.example). Two scripts help outside the UI: `npm run inject:fault jpy_zero_decimal_500` ships a bad release from a terminal, and `npm run onboard:switch` registers the agents in Mode B.
 
 **Test status (Nov 6, 2026):**
-- **Vigil:** `Tests  7 passed (7)` in about 6 s. They cover the template schema; the WebSocket handshake, `ping`/`pong`, `409` lease contention, `403` document authorship and `taken_over` fencing; disguised agent senders; external-coder routing with a rejected non-fix and room-document policy; commander failover; a full incident through promotion; and an emergency rollback.
+- **Vigil:** `Tests  19 passed (19)` in about 11 s, across 5 files. They cover the template schema; the WebSocket handshake, `ping`/`pong`, `409` lease contention, `403` document authorship and `taken_over` fencing; disguised agent senders; external-coder routing with a rejected non-fix and room-document policy; commander failover; a full incident through promotion; an emergency rollback; monitoring-tool alerts and their authentication; incidents surviving a restart; a target cloned from its own git repository; the gate's fail-closed sender rules, handle-based approvers and discarded candidates; an incident staying open when canaries fall short of the policy; and Vigil stopping its service on `SIGTERM`.
 - **checkout-api on `v2.13.2`:** `pass 5, fail 0` with `node --import tsx --test test/cartPricing.test.ts`.
 - **Each regression fails only its own tests:** the JPY patch fails the JPY and KRW tests (3 pass, 2 fail), the promo patch fails the promo test (4 pass, 1 fail), and the inventory patch fails the fraud-decline lock test (4 pass, 1 fail).
 
@@ -375,12 +377,16 @@ src/protocol/switchClient.ts         Switch agent client: WebSocket frames, ping
 src/protocol/types.ts                Switch frame, room, role, document and link types
 src/mock-switch/switchServerHarness.ts  embedded Switch protocol server for Mode A: rooms, roles, documents, links, templates, eviction
 src/services/checkoutTarget.ts       the live target: git working copy, child process, traffic, alerts, verification, staging, release, canaries
+src/services/targetManifest.ts       loads and checks the target manifest (VIGIL_TARGET)
+src/services/alertAdapters.ts        turns Alertmanager, Sentry and generic JSON alerts into Vigil alerts
+targets/                             target manifests: checkout-api.target.json (the demo service) and README.md (every field)
 services/checkout-api/src/           the real service: cartPricing.ts (pricing, promos, inventory locks) and server.ts (HTTP, metrics, alert webhook)
 services/checkout-api/test/          the service's node:test suite (5 tests)
 services/checkout-api/releases/      the three seeded regression patches
 templates/                           Switch group template (3 rooms) and the per-incident workroom template
-tests/                               Vitest integration suite (7 tests)
-scripts/                             onboard-switch-agents.ts, inject-fault.ts, install-switch-console.sh
+tests/                               Vitest suite (19 tests in 5 files)
+scripts/                             onboard-switch-agents.ts, inject-fault.ts, install-switch-console.sh, setup-coder-user.sh
+public/brand/                        the logo lockup and the favicon set
 ui/                                  React UI: Landing.tsx (/), App.tsx (/app), theme.css, landing.css, warroom.css, VigilMark.tsx
 docs/                                blog post and #HowISwitch social posts
 CLAUDE.md                            the brief for an external coding agent acting as patch author
