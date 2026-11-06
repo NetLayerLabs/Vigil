@@ -80,31 +80,19 @@ async function main() {
     upsertEnv(`${s.envPrefix}_API_KEY`, reg.api_key);
     console.log(`  ✓ ${s.name} -> id=${reg.id}`);
 
-    // A newly registered Switch agent answers only its owner. Vigil needs agent-to-agent handoffs
-    // (sentinel -> patcher -> release gate) and approvals from any human teammate in the room.
-    const client = new SwitchAgentClient({
-      baseUrl: switchUrl,
-      agentId: reg.id,
-      agentName: s.name,
-      apiKey: reg.api_key,
-    });
-    try {
-      await client.updateAddressing('anyone');
-      console.log(`    addressing -> anyone`);
-    } catch (err) {
-      console.warn(`    ! could not widen addressing for ${s.name}: ${(err as Error).message}`);
-      console.warn(`      Set it in Switch Console -> agent settings -> "Choose who can instruct the agent".`);
-    }
+    // Who may address each agent is set when Vigil starts: Switch only accepts that change from an
+    // agent with an open connection, and never from the agent itself, so the agents set it for each other.
   }
 
   writeFileSync(envPath, envContent, 'utf8');
   console.log('\nSaved registered Switch Agent credentials to .env!');
-  console.log('Next step:');
-  console.log('  1. In Switch Console -> Templates -> Import template: upload templates/vigil-war-room.template.yaml');
-  console.log('     (Select "Existing agent" on the 3 agent cards to attach these registered WebSocket agents.)');
-  console.log('  2. Optional: bind your local Claude Code / Codex session into #vigil-hotfix via Switch Console and set');
-  console.log('     SWITCH_CONSOLE_CODER_HANDLE=<its agent name> so vigil-patcher becomes the verifier (CLAUDE.md briefs it).');
-  console.log('  3. Start Vigil connected to your live Switch Server: npm run dev');
+  console.log('Next step: start Vigil against this Switch server (npm run dev, or npm start after a build).');
+  console.log('On first start Vigil:');
+  console.log(`  - lets any human teammate and the sibling agents address ${team}-sentinel, ${team}-patcher and ${team}-release-gate;`);
+  console.log(`  - creates #${team}-incidents, #${team}-hotfix and #${team}-releases (roles, documents, links) from`);
+  console.log('    templates/vigil-war-room.template.yaml through the create_room_from_yaml operation.');
+  console.log('Optional: bind Claude Code / Codex into #' + team + '-hotfix with Switch Console and set');
+  console.log('  SWITCH_CONSOLE_CODER_HANDLE=<its agent name> so vigil-patcher becomes the verifier (CLAUDE.md briefs it).');
 }
 
 main().catch((err) => {
