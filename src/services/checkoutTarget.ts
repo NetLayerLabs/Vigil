@@ -268,6 +268,23 @@ export class LiveCheckoutTarget {
     await this.git(['add', '-A']);
     await this.gitCommit(`release: ${LAST_KNOWN_GOOD_VERSION} checkout-api (last known good)`, 'Release Bot <release-bot@team.dev>');
     await this.git(['tag', LAST_KNOWN_GOOD_VERSION]);
+    await this.shareWorkingCopy();
+  }
+
+  /**
+   * Optional: let an external coding agent that runs as its own unprivileged user edit the live
+   * working copy. With VIGIL_SHARED_GROUP set, the copy belongs to that group, is group-writable,
+   * and new files inherit the group (setgid directories, umask 002, git's shared repository mode).
+   */
+  private async shareWorkingCopy(): Promise<void> {
+    const group = (process.env.VIGIL_SHARED_GROUP ?? '').trim();
+    if (!group) return;
+    if (!/^[a-z_][a-z0-9_-]*$/.test(group)) throw new Error(`VIGIL_SHARED_GROUP is not a group name: ${group}`);
+    process.umask(0o002);
+    await this.git(['config', 'core.sharedRepository', 'group']);
+    await execFileAsync('chgrp', ['-R', '-h', group, this.workDir]);
+    await execFileAsync('chmod', ['-R', 'g+rwX', this.workDir]);
+    await execFileAsync('find', [this.workDir, '-path', path.join(this.workDir, 'node_modules'), '-prune', '-o', '-type', 'd', '-exec', 'chmod', 'g+s', '{}', '+']);
   }
 
   private async startAlertCollector(): Promise<void> {
