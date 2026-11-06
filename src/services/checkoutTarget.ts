@@ -15,6 +15,8 @@ import { createServer, IncomingMessage, Server as HttpServer } from 'node:http';
 import path from 'node:path';
 import { randomBytes } from 'node:crypto';
 
+import { loadTargetManifest, resolveCommand } from './targetManifest.js';
+
 const execFileAsync = promisify(execFile);
 
 /**
@@ -99,9 +101,13 @@ export interface RepoCommit {
   at: number;
 }
 
-export const LAST_KNOWN_GOOD_VERSION = 'v2.13.2';
+/** The guarded service, from its target manifest (VIGIL_TARGET, default targets/checkout-api.target.json). */
+export const TARGET = loadTargetManifest();
+export const LAST_KNOWN_GOOD_VERSION = TARGET.versions.lastKnownGood;
 export const REGRESSION_VERSION = 'v2.14.0';
-export const HOTFIX_VERSION = 'v2.14.1-hotfix';
+export const HOTFIX_VERSION = TARGET.versions.hotfix;
+/** Where the source lives in this repository, for file paths shown in dossiers and diffs. */
+const SOURCE_LABEL = 'path' in TARGET.source ? TARGET.source.path : TARGET.name;
 
 /**
  * The three seeded regressions. Each is a real patch file under `services/checkout-api/releases`
@@ -163,14 +169,6 @@ export const FAULT_CATALOG: Record<
   },
 };
 
-const SYNTHETIC_TRAFFIC: CheckoutRequest[] = [
-  { cartId: 'traffic_usd', currency: 'USD', items: [{ sku: 'PRO', qty: 1, unitPriceMajor: 99 }] },
-  { cartId: 'traffic_eur', currency: 'EUR', items: [{ sku: 'PRO', qty: 1, unitPriceMajor: 89 }] },
-  { cartId: 'traffic_jpy', currency: 'JPY', items: [{ sku: 'PRO', qty: 2, unitPriceMajor: 4800 }] },
-  { cartId: 'traffic_gbp', currency: 'GBP', items: [{ sku: 'TEAM', qty: 3, unitPriceMajor: 45 }] },
-  { cartId: 'traffic_promo', currency: 'USD', items: [{ sku: 'STARTER', qty: 1, unitPriceMajor: 29 }], promoCodes: ['SAVE15'] },
-  { cartId: 'traffic_krw', currency: 'KRW', items: [{ sku: 'PRO', qty: 1, unitPriceMajor: 55000 }] },
-];
 
 export interface LiveCheckoutTargetOptions {
   /** Source of truth for the service code (checked into this repo). */
@@ -216,9 +214,9 @@ export class LiveCheckoutTarget {
   };
 
   constructor(opts: LiveCheckoutTargetOptions = {}) {
-    this.sourceDir = opts.sourceDir ?? path.resolve(process.cwd(), 'services/checkout-api');
+    this.sourceDir = opts.sourceDir ?? ('path' in TARGET.source ? path.resolve(process.cwd(), TARGET.source.path) : '');
     this.explicitWorkDir = opts.workDir ?? null;
-    this.workDir = opts.workDir ?? path.resolve(process.cwd(), '.vigil-state', `checkout-api-live-${randomBytes(3).toString('hex')}`);
+    this.workDir = opts.workDir ?? path.resolve(process.cwd(), '.vigil-state', `${TARGET.name}-live-${randomBytes(3).toString('hex')}`);
     this.trafficIntervalMs = opts.trafficIntervalMs ?? 250;
   }
   private readonly explicitWorkDir: string | null;
@@ -246,7 +244,7 @@ export class LiveCheckoutTarget {
     // A fixed port means a long-lived run: use a stable path so an external coding agent can be
     // pointed at it. Ephemeral ports (tests) keep a random suffix so parallel runs never collide.
     if (!this.explicitWorkDir && port !== 0) {
-      this.workDir = path.resolve(process.cwd(), '.vigil-state', `checkout-api-live-${port}`);
+      this.workDir = path.resolve(process.cwd(), '.vigil-state', `${TARGET.name}-live-${port}`);
     }
     await this.prepareRepo();
     await this.startAlertCollector();
@@ -273,8 +271,26 @@ export class LiveCheckoutTarget {
   }
 
   private async prepareRepo(): Promise<void> {
-    if (!existsSync(this.sourceDir)) throw new Error(`checkout-api source not found at ${this.sourceDir}`);
     rmSync(this.workDir, { recursive: true, force: true });
+    if ('git' in TARGET.source) {
+      // A repository you guard: clone it, start from its last known good tag.
+      mkdirSync(path.dirname(this.workDir), { recursive: true });
+      await execFileAsync('git', ['clone', '-q', TARGET.source.git, this.workDir], { env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } });
+      const tags = await this.git(['tag', '--list', LAST_KNOWN_GOOD_VERSION]);
+      if (tags.trim() === '') {
+        if (TARGET.source.ref) await this.git(['checkout', '-q', TARGET.source.ref]);
+        await this.git(['tag', LAST_KNOWN_GOOD_VERSION]);
+      }
+      await this.git(['checkout', '-q', '-B', 'main', LAST_KNOWN_GOOD_VERSION]);
+      if (TARGET.install) {
+        const { cmd, args } = resolveCommand(TARGET.install);
+        await execFileAsync(cmd, args, { cwd: this.workDir, ...serviceProcessOptions({}) });
+      }
+      await this.shareWorkingCopy();
+      return;
+    }
+
+    if (!existsSync(this.sourceDir)) throw new Error(`${TARGET.name} source not found at ${this.sourceDir}`);
     mkdirSync(this.workDir, { recursive: true });
     cpSync(this.sourceDir, this.workDir, {
       recursive: true,
@@ -288,7 +304,7 @@ export class LiveCheckoutTarget {
 
     await this.git(['init', '-q', '-b', 'main']);
     await this.git(['add', '-A']);
-    await this.gitCommit(`release: ${LAST_KNOWN_GOOD_VERSION} checkout-api (last known good)`, 'Release Bot <release-bot@team.dev>');
+    await this.gitCommit(`release: ${LAST_KNOWN_GOOD_VERSION} ${TARGET.name} (last known good)`, 'Release Bot <release-bot@team.dev>');
     await this.git(['tag', LAST_KNOWN_GOOD_VERSION]);
     await this.shareWorkingCopy();
   }
@@ -332,37 +348,49 @@ export class LiveCheckoutTarget {
   }
 
   private async spawnService(port: number): Promise<void> {
-    const expectedVersion = readFileSync(path.join(this.workDir, 'VERSION'), 'utf8').trim();
+    const expectedVersion = this.expectedVersion();
     this.processGeneration += 1;
-    this.child = spawn(process.execPath, ['--import', 'tsx', 'src/server.ts'], {
+    const { cmd, args } = resolveCommand(TARGET.start);
+    this.child = spawn(cmd, args, {
       cwd: this.workDir,
-      ...serviceProcessOptions({
-        PORT: String(port),
-        CHECKOUT_API_PORT: String(port),
-        VIGIL_ALERT_WEBHOOK: SELF_ALERTS ? this.alertUrl : '',
-      }),
+      ...serviceProcessOptions({ ...portEnv(port), VIGIL_ALERT_WEBHOOK: SELF_ALERTS ? this.alertUrl : '' }),
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     this.child.stdout?.on('data', () => undefined);
     this.child.stderr?.on('data', (d) => {
       const text = String(d);
-      if (/error/i.test(text) && !/ExperimentalWarning/.test(text)) process.stderr.write(`[checkout-api] ${text}`);
+      if (/error/i.test(text) && !/ExperimentalWarning/.test(text)) process.stderr.write(`[${TARGET.name}] ${text}`);
     });
 
     const deadline = Date.now() + 15_000;
     while (Date.now() < deadline) {
       try {
-        const res = await fetch(`http://127.0.0.1:${port}/health`);
+        const res = await fetch(`http://127.0.0.1:${port}${TARGET.healthPath}`);
         if (res.ok) {
-          const body = (await res.json()) as { deployedVersion: string };
-          if (body.deployedVersion === expectedVersion) return;
+          const body = (await res.json().catch(() => ({}))) as { deployedVersion?: string };
+          // A service that reports its version must be running the release we just deployed.
+          if (!expectedVersion || body.deployedVersion === undefined || body.deployedVersion === expectedVersion) return;
         }
       } catch {
         // not up yet
       }
       await sleep(100);
     }
-    throw new Error(`checkout-api ${expectedVersion} did not become healthy on :${port}`);
+    throw new Error(`${TARGET.name} ${expectedVersion ?? ''} did not become healthy on :${port}`.replace('  ', ' '));
+  }
+
+  /** The release the working copy says it is (its VERSION file), if it keeps one. */
+  private expectedVersion(): string | null {
+    const file = path.join(this.workDir, 'VERSION');
+    return existsSync(file) ? readFileSync(file, 'utf8').trim() : null;
+  }
+
+  /** Send the manifest's endpoint request (traffic, reproduction, staging replay, canaries). */
+  private callEndpoint(baseUrl: string, body: unknown): Promise<Response> {
+    const { method, path: route } = TARGET.endpoint;
+    const url = `${baseUrl}${route}`;
+    if (method === 'GET' || method === 'DELETE' || body === undefined) return fetch(url, { method });
+    return fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   }
 
   private async killService(): Promise<void> {
@@ -399,7 +427,19 @@ export class LiveCheckoutTarget {
     if (this.restarting || !this.child) return;
     const generation = this.processGeneration;
     try {
-      const res = await fetch(`${this.getBaseUrl()}/metrics`);
+      if (!TARGET.metricsPath) {
+        // No metrics endpoint: report what the health check can tell.
+        const health = await fetch(`${this.getBaseUrl()}${TARGET.healthPath}`);
+        if (generation !== this.processGeneration) return;
+        this.cachedMetrics = {
+          ...this.cachedMetrics,
+          deployedVersion: this.expectedVersion() ?? this.cachedMetrics.deployedVersion,
+          pid: this.child?.pid ?? 0,
+          status: health.ok ? 'healthy' : 'degraded',
+        };
+        return;
+      }
+      const res = await fetch(`${this.getBaseUrl()}${TARGET.metricsPath}`);
       if (!res.ok) return;
       const m = (await res.json()) as typeof this.cachedMetrics;
       if (generation !== this.processGeneration) return; // a deploy happened mid-flight
@@ -423,13 +463,10 @@ export class LiveCheckoutTarget {
   private trafficCursor = 0;
   private async tickTraffic(): Promise<void> {
     if (this.restarting || !this.child) return;
-    const payload = SYNTHETIC_TRAFFIC[this.trafficCursor++ % SYNTHETIC_TRAFFIC.length];
+    if (TARGET.traffic.length === 0) return;
+    const payload = TARGET.traffic[this.trafficCursor++ % TARGET.traffic.length] as Record<string, unknown>;
     try {
-      await fetch(`${this.getBaseUrl()}/api/checkout`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...payload, cartId: `${payload.cartId}_${this.trafficCursor}` }),
-      });
+      await this.callEndpoint(this.getBaseUrl(), withSuffix(payload, `${this.trafficCursor}`));
     } catch {
       // connection refused during restarts is not a service error
     }
@@ -489,14 +526,14 @@ export class LiveCheckoutTarget {
 
   /** First changed line of the regression commit inside the service source, for the dossier. */
   private async locateChange(sha: string): Promise<{ filePath: string; line: number }> {
-    const diff = await this.git(['show', '--format=', '--unified=0', sha, '--', 'src']).catch(() => '');
-    let filePath = 'src/cartPricing.ts';
+    const diff = await this.git(['show', '--format=', '--unified=0', sha, '--', ...TARGET.codePaths]).catch(() => '');
+    let filePath = TARGET.codePaths[0];
     let line = 1;
     const fileMatch = diff.match(/^\+\+\+ b\/(.+)$/m);
     if (fileMatch) filePath = fileMatch[1];
     const hunk = diff.match(/^@@ -\d+(?:,\d+)? \+(\d+)/m);
     if (hunk) line = Number(hunk[1]);
-    return { filePath: `services/checkout-api/${filePath}`, line };
+    return { filePath: `${SOURCE_LABEL}/${filePath}`, line };
   }
 
   // ------------------------------------------------------------------ regression deploy (real)
@@ -507,6 +544,7 @@ export class LiveCheckoutTarget {
    * payload against the new process. The service itself raises the alert webhook on its first 5xx.
    */
   public async injectFaultRelease(scenarioId: FaultScenarioId): Promise<IncidentAlertWebhook | null> {
+    if (TARGET.faults === 'none') throw new Error(`Chaos releases are off for ${TARGET.name} (its manifest sets "faults": "none").`);
     const spec = FAULT_CATALOG[scenarioId];
     const patchPath = path.join(this.sourceDir, 'releases', spec.patchFile);
     if (!existsSync(patchPath)) throw new Error(`Missing release patch ${patchPath}`);
@@ -526,11 +564,7 @@ export class LiveCheckoutTarget {
 
     // Replay the production payload against the freshly deployed process (real HTTP).
     for (let i = 0; i < spec.reproAttempts; i++) {
-      await fetch(`${this.getBaseUrl()}/api/checkout`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...spec.reproPayload, cartId: `${spec.reproPayload.cartId}_${i}` }),
-      }).catch(() => undefined);
+      await this.callEndpoint(this.getBaseUrl(), withSuffix(spec.reproPayload, `${i}`)).catch(() => undefined);
     }
 
     // With self-alerts off, a monitoring tool raises the alert; the release itself is done.
@@ -578,7 +612,7 @@ export class LiveCheckoutTarget {
     const alert: IncidentAlertWebhook = {
       incidentId: `INC-${this.incidentSequence}`,
       scenarioId,
-      service: raw.service ?? 'checkout-api',
+      service: raw.service ?? TARGET.name,
       deployedVersion: version,
       lastKnownGoodVersion: LAST_KNOWN_GOOD_VERSION,
       suspectedCommit: {
@@ -588,7 +622,7 @@ export class LiveCheckoutTarget {
         filePath: where.filePath,
         line: where.line,
       },
-      endpoint: raw.endpoint ?? 'POST /api/checkout',
+      endpoint: raw.endpoint ?? `${TARGET.endpoint.method} ${TARGET.endpoint.path}`,
       httpStatus: raw.httpStatus ?? 500,
       errorRatePct: raw.metrics?.errorRatePct ?? 0,
       p99LatencyMs: Math.round((raw.metrics?.p99LatencyMs ?? 0) * 10) / 10,
@@ -611,11 +645,7 @@ export class LiveCheckoutTarget {
     let last: { status: number; body: { error?: string; message?: string } } | null = null;
     for (let i = 0; i < spec.reproAttempts; i++) {
       try {
-        const res = await fetch(`${this.getBaseUrl()}/api/checkout`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...spec.reproPayload, cartId: `${spec.reproPayload.cartId}_repro_${i}` }),
-        });
+        const res = await this.callEndpoint(this.getBaseUrl(), withSuffix(spec.reproPayload, `repro_${i}`));
         last = { status: res.status, body: (await res.json().catch(() => ({}))) as { error?: string; message?: string } };
       } catch (err) {
         last = { status: 0, body: { error: 'NetworkError', message: String(err) } };
@@ -632,7 +662,8 @@ export class LiveCheckoutTarget {
   /** Run the service's real test suite in the working copy (node:test, TAP reporter). */
   private async runServiceTests(): Promise<{ matrix: PatchVerificationResult['testMatrix']; raw: string; green: boolean }> {
     const { stdout, stderr, code } = await new Promise<{ stdout: string; stderr: string; code: number }>((resolve) => {
-      const p = spawn(process.execPath, ['--import', 'tsx', '--test', '--test-reporter=tap', 'test/cartPricing.test.ts'], {
+      const testCmd = resolveCommand(TARGET.test);
+      const p = spawn(testCmd.cmd, testCmd.args, {
         cwd: this.workDir,
         ...serviceProcessOptions({}),
       });
@@ -662,7 +693,12 @@ export class LiveCheckoutTarget {
       matrix.push({ name: m[2].trim(), passed, detail });
     }
     if (matrix.length === 0) {
-      matrix.push({ name: 'service test suite executed', passed: false, detail: (stderr || stdout).slice(0, 200) || `exit code ${code}` });
+      // No TAP output: the test command's exit code is the verdict.
+      matrix.push({
+        name: `test suite (${TARGET.test.join(' ')})`,
+        passed: code === 0,
+        detail: code === 0 ? 'exit code 0' : (stderr || stdout).slice(-200) || `exit code ${code}`,
+      });
     }
     return { matrix, raw: (stdout + stderr).slice(-4000), green: code === 0 && matrix.every((t) => t.passed) };
   }
@@ -671,9 +707,10 @@ export class LiveCheckoutTarget {
   private async stagingProbe(scenarioId: FaultScenarioId): Promise<{ passed: boolean; detail: string }> {
     const spec = FAULT_CATALOG[scenarioId];
     const port = 20000 + Math.floor(Math.random() * 20000);
-    const child = spawn(process.execPath, ['--import', 'tsx', 'src/server.ts'], {
+    const start = resolveCommand(TARGET.start);
+    const child = spawn(start.cmd, start.args, {
       cwd: this.workDir,
-      ...serviceProcessOptions({ PORT: String(port), VIGIL_ALERT_WEBHOOK: '' }),
+      ...serviceProcessOptions({ ...portEnv(port), VIGIL_ALERT_WEBHOOK: '' }),
       stdio: 'ignore',
     });
     try {
@@ -681,7 +718,7 @@ export class LiveCheckoutTarget {
       let up = false;
       while (Date.now() < deadline && !up) {
         try {
-          up = (await fetch(`http://127.0.0.1:${port}/health`)).ok;
+          up = (await fetch(`http://127.0.0.1:${port}${TARGET.healthPath}`)).ok;
         } catch {
           await sleep(80);
         }
@@ -690,11 +727,7 @@ export class LiveCheckoutTarget {
       let last = 0;
       let body: { chargeMinorUnits?: number; error?: string; message?: string } = {};
       for (let i = 0; i < spec.reproAttempts; i++) {
-        const res = await fetch(`http://127.0.0.1:${port}/api/checkout`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...spec.reproPayload, cartId: `${spec.reproPayload.cartId}_stage_${i}` }),
-        });
+        const res = await this.callEndpoint(`http://127.0.0.1:${port}`, withSuffix(spec.reproPayload, `stage_${i}`));
         last = res.status;
         body = (await res.json().catch(() => ({}))) as typeof body;
       }
@@ -712,14 +745,14 @@ export class LiveCheckoutTarget {
 
   private async describeCandidate(baseRef: string): Promise<{ diff: string; changedLines: number; touchedFiles: string[]; sha: string }> {
     const sha = await this.headSha();
-    const diff = await this.git(['diff', '--no-color', baseRef, 'HEAD', '--', 'src', 'test']);
-    const numstat = await this.git(['diff', '--numstat', baseRef, 'HEAD', '--', 'src', 'test']);
+    const diff = await this.git(['diff', '--no-color', baseRef, 'HEAD', '--', ...TARGET.codePaths]);
+    const numstat = await this.git(['diff', '--numstat', baseRef, 'HEAD', '--', ...TARGET.codePaths]);
     let changedLines = 0;
     const touchedFiles: string[] = [];
     for (const line of numstat.split('\n').filter(Boolean)) {
       const [add, del, file] = line.split('\t');
       changedLines += (Number(add) || 0) + (Number(del) || 0);
-      touchedFiles.push(`services/checkout-api/${file}`);
+      touchedFiles.push(`${SOURCE_LABEL}/${file}`);
     }
     return { diff, changedLines, touchedFiles, sha };
   }
@@ -889,35 +922,26 @@ export class LiveCheckoutTarget {
   }
 
   public async runSyntheticCanaryProbes(): Promise<CanaryProbeReport> {
-    const probes: CheckoutRequest[] = [
-      { cartId: 'canary_usd', currency: 'USD', items: [{ sku: 'PRO', qty: 1, unitPriceMajor: 99 }] },
-      { cartId: 'canary_eur', currency: 'EUR', items: [{ sku: 'PRO', qty: 1, unitPriceMajor: 89 }] },
-      { cartId: 'canary_jpy', currency: 'JPY', items: [{ sku: 'PRO', qty: 2, unitPriceMajor: 4800 }] },
-      { cartId: 'canary_krw', currency: 'KRW', items: [{ sku: 'PRO', qty: 1, unitPriceMajor: 55000 }] },
-      { cartId: 'canary_promo', currency: 'USD', items: [{ sku: 'STARTER', qty: 1, unitPriceMajor: 29 }], promoCodes: ['VIP40', 'SAVE15', 'VIP40'] },
-    ];
+    const probes = TARGET.canaries;
     let passed = 0;
     let maxLatencyMs = 0;
     const details: string[] = [];
-    for (const payload of probes) {
+    for (const probe of probes) {
       const t0 = Date.now();
       try {
-        const res = await fetch(`${this.getBaseUrl()}/api/checkout`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
+        const res = await this.callEndpoint(this.getBaseUrl(), probe.body);
         const elapsed = Math.max(1, Date.now() - t0);
         maxLatencyMs = Math.max(maxLatencyMs, elapsed);
         if (res.ok) {
           passed += 1;
-          const body = (await res.json()) as { chargeMinorUnits: number };
-          details.push(`${payload.cartId} (${payload.currency}): 200 OK [${body.chargeMinorUnits} minor, ${elapsed}ms]`);
+          const body = (await res.json().catch(() => ({}))) as { chargeMinorUnits?: number };
+          const charge = body.chargeMinorUnits !== undefined ? `${body.chargeMinorUnits} minor, ` : '';
+          details.push(`${probe.name}: ${res.status} OK [${charge}${elapsed}ms]`);
         } else {
-          details.push(`${payload.cartId} (${payload.currency}): FAILED HTTP ${res.status}`);
+          details.push(`${probe.name}: FAILED HTTP ${res.status}`);
         }
       } catch (err) {
-        details.push(`${payload.cartId} (${payload.currency}): FAILED ${String(err)}`);
+        details.push(`${probe.name}: FAILED ${String(err)}`);
       }
     }
     await this.pollMetrics();
@@ -962,4 +986,18 @@ async function findFreePort(): Promise<number> {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+/** The manifest's port variables, all set to the port the service must listen on. */
+function portEnv(port: number): Record<string, string> {
+  return Object.fromEntries(TARGET.portEnv.map((name) => [name, String(port)]));
+}
+
+/** Keep request ids unique per send: append a suffix to `cartId` (or `id`) when the body has one. */
+function withSuffix(body: unknown, suffix: string): unknown {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return body;
+  const b = body as Record<string, unknown>;
+  if (typeof b.cartId === 'string') return { ...b, cartId: `${b.cartId}_${suffix}` };
+  if (typeof b.id === 'string') return { ...b, id: `${b.id}_${suffix}` };
+  return b;
 }
