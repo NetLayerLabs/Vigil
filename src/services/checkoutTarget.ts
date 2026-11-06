@@ -211,6 +211,11 @@ export class LiveCheckoutTarget {
     return this.workDir;
   }
 
+  /** Continue numbering after incidents a live Switch server already has rooms for (`INC-<n>`). */
+  public seedIncidentSequence(lastUsed: number): void {
+    if (Number.isFinite(lastUsed) && lastUsed > this.incidentSequence) this.incidentSequence = lastUsed;
+  }
+
   public setIncidentWebhook(cb: (alert: IncidentAlertWebhook) => Promise<void> | void): void {
     this.onIncidentAlert = cb;
   }
