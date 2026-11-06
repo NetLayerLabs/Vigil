@@ -902,9 +902,7 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
                     <span className="wr-row-name">
                       <span className={`wr-sq ${ag.online ? '' : 'wr-sq--alert'}`} />@{ag.name}
                     </span>
-                    <span className="wr-row-meta">
-                      cursor {ag.cursor} · gen {ag.generation ?? '-'}
-                    </span>
+                    <span className="wr-row-meta">{ag.online ? 'online' : 'offline'}</span>
                   </div>
                   <p className="wr-row-desc">{ag.description}</p>
                 </div>
@@ -997,17 +995,27 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
                   const kind = m.sender_kind ?? (m.sender.startsWith('@switch-agent-') ? 'agent' : 'user');
                   const isAgent = kind === 'agent';
                   const isHuman = kind === 'user';
+                  // Agents and Switch write plain text here; a person's message is shown exactly as sent.
+                  const body = isHuman ? m.body : withoutPictographs(m.body);
+                  // Switch's own one-line notices (a role taken or released, a document written).
+                  if (!isHuman && ROOM_NOTICE.test(body)) {
+                    return (
+                      <div key={m.message_id} className="wr-notice">
+                        <b>{m.sender_name}</b> {inlineMarkdown(body)}
+                      </div>
+                    );
+                  }
                   return (
                     <article key={m.message_id} className={`wr-msg ${isHuman ? 'wr-msg--human' : ''}`}>
                       <div className="wr-msg-head">
-                        <span className={`wr-tag ${isAgent ? 'wr-tag--ink' : isHuman ? 'wr-tag--brand' : ''}`}>
-                          {isAgent ? 'Agent' : isHuman ? 'Human' : 'Switch'}
-                        </span>
                         <span className="wr-msg-name">{m.sender_name}</span>
+                        <span className={`wr-tag ${isHuman ? 'wr-tag--brand' : ''}`}>
+                          {isAgent ? 'agent' : isHuman ? 'person' : 'Switch'}
+                        </span>
                         <span className="wr-msg-handle">{m.sender}</span>
                         {m.seq > 0 && <span className="wr-msg-seq">#{m.seq}</span>}
                       </div>
-                      <MessageBody text={m.body} />
+                      <MessageBody text={body} />
                     </article>
                   );
                 })}
@@ -1507,6 +1515,17 @@ function MessageBody({ text }: { text: string }) {
       )}
     </div>
   );
+}
+
+/** Switch's one-line room notices, e.g. "assumed the `patch-author` role", "created room document …". */
+const ROOM_NOTICE = /^(assumed|released) the `[^`]+` role\.?$|^(created|updated) room document\b/i;
+
+/** Drop emoji and other pictographs (and the spacing they leave), for agent and Switch messages. */
+function withoutPictographs(text: string): string {
+  return text
+    .replace(/[\p{Extended_Pictographic}\uFE0F\u200D]/gu, '')
+    .replace(/^[ \t]+/gm, '')
+    .trim();
 }
 
 function inlineMarkdown(line: string): React.ReactNode[] {
