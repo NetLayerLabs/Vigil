@@ -5,7 +5,7 @@ import path from 'node:path';
 import { URL } from 'node:url';
 import { WebSocket, WebSocketServer } from 'ws';
 import { SwitchServerHarness } from './mock-switch/switchServerHarness.js';
-import { CheckoutMicroservice, FAULT_CATALOG, FaultScenarioId } from './services/checkoutTarget.js';
+import { CheckoutMicroservice, FAULT_CATALOG, FaultScenarioId, TARGET } from './services/checkoutTarget.js';
 import { VigilMeshCoordinator } from './agents/vigilMeshCoordinator.js';
 import { ALERT_PROVIDERS, AlertProvider, normalizeAlert } from './services/alertAdapters.js';
 
@@ -129,7 +129,7 @@ export async function startVigilRuntime(opts: {
     if (liveRoomsCache && Date.now() - liveRoomsCache.at < 2000) return liveRoomsCache.rooms;
     const rooms = (async () => {
       const reader = coordinator.releaseGateClient;
-      const listed = await reader.listRooms();
+      const listed = await reader.listRooms(true);
       const team = `${coordinator.teamPrefix}-`;
       const workrooms = listed.filter((r) => r.name.startsWith('hotfix-')).slice(-3);
       const mine = [...listed.filter((r) => r.name.startsWith(team)), ...workrooms];
@@ -154,7 +154,7 @@ export async function startVigilRuntime(opts: {
             name: r.name,
             description: d.description ?? '',
             instructions: d.instructions ?? '',
-            bridge: d.bridge_display_name ?? 'Mattermost',
+            bridge: d.bridge_display_name ?? 'no chat bridge',
             channel_type: d.channel_type ?? 'channel_public',
             archived: Boolean(d.archived ?? (r as { archived?: boolean }).archived),
             ephemeral: r.name.startsWith('hotfix-'),
@@ -169,7 +169,8 @@ export async function startVigilRuntime(opts: {
             }),
             documents,
             links,
-            seq: ctx.messages.length,
+            // read_context carries no sequence numbers; 0 tells the War Room to show none
+            seq: 0,
             messages: ctx.messages.map((m) => ({ ...m, room_id: r.id, room_name: r.name })),
           };
         }),
@@ -202,7 +203,7 @@ export async function startVigilRuntime(opts: {
             displayName: 'Vigil Sentinel',
             description: 'Watches checkout-api, opens incidents and leads them',
             participantId: `@switch-agent-${coordinator.sentinelClient.agentName}`,
-            online: !coordinator.sentinelClient.isStoppedPermanently(),
+            online: coordinator.sentinelClient.isConnected(),
             cursor: coordinator.sentinelClient.getCursor(),
             generation: coordinator.sentinelClient.getGeneration() ?? null,
           },
@@ -212,7 +213,7 @@ export async function startVigilRuntime(opts: {
             displayName: 'Vigil Patcher',
             description: 'Reproduces the bug, fixes or checks the fix, runs the tests',
             participantId: `@switch-agent-${coordinator.patcherClient.agentName}`,
-            online: !coordinator.patcherClient.isStoppedPermanently(),
+            online: coordinator.patcherClient.isConnected(),
             cursor: coordinator.patcherClient.getCursor(),
             generation: coordinator.patcherClient.getGeneration() ?? null,
           },
@@ -222,7 +223,7 @@ export async function startVigilRuntime(opts: {
             displayName: 'Vigil Release Gate',
             description: 'Ships or rolls back only when a person approves',
             participantId: `@switch-agent-${coordinator.releaseGateClient.agentName}`,
-            online: !coordinator.releaseGateClient.isStoppedPermanently(),
+            online: coordinator.releaseGateClient.isConnected(),
             cursor: coordinator.releaseGateClient.getCursor(),
             generation: coordinator.releaseGateClient.getGeneration() ?? null,
           },
@@ -236,7 +237,7 @@ export async function startVigilRuntime(opts: {
       checkoutBaseUrl: checkoutService.getBaseUrl(),
       checkoutTelemetry: checkoutService.getTelemetry(),
       checkoutRepo: { workDir: checkoutService.getWorkDir(), log: await checkoutService.getRepoLog(8) },
-      faultCatalog: FAULT_CATALOG,
+      faultCatalog: TARGET.faults === 'none' ? {} : FAULT_CATALOG,
       switchState: switchSnapshot,
       incidents: coordinator.getIncidents(),
       activeIncident: coordinator.getActiveIncident(),
@@ -313,7 +314,11 @@ export async function startVigilRuntime(opts: {
     return expected.length > 0 && a.length === b.length && timingSafeEqual(a, b);
   };
   const mayPostAlert = (req: IncomingMessage, url: URL, provider: string, rawBody: string): boolean => {
-    if (isOperator(req)) return true;
+    // With no alert secret configured, alerts follow the operator rule (open when no operator key is set).
+    if (!alertToken && !sentrySecret) return isOperator(req);
+    // With one configured, it is required: only the host itself or the real operator key skips it.
+    if (isDirectLoopback(req)) return true;
+    if (operatorKey && isOperator(req)) return true;
     const auth = String(req.headers.authorization ?? '');
     const given = auth.startsWith('Bearer ') ? auth.slice(7).trim() : (url.searchParams.get('token') ?? '');
     if (alertToken && sameSecret(given, alertToken)) return true;
@@ -395,6 +400,10 @@ export async function startVigilRuntime(opts: {
         const wait = lastPublicChaosAt + PUBLIC_CHAOS_COOLDOWN_MS - Date.now();
         if (!operator && wait > 0) {
           sendJson(res, 429, { error: `One chaos release per 30 seconds. Try again in ${Math.ceil(wait / 1000)}s.` });
+          return;
+        }
+        if (TARGET.faults === 'none') {
+          sendJson(res, 403, { error: `Chaos releases are off for ${TARGET.name} (its manifest sets "faults": "none").` });
           return;
         }
         if (!operator) lastPublicChaosAt = Date.now();
@@ -559,10 +568,17 @@ export async function startVigilRuntime(opts: {
           // Live Switch server. The rogue-agent test is real: the patcher agent posts the approval under
           // its own identity and the release gate must refuse it. Nothing here may speak as a human, so
           // human approvals happen in the messaging app.
+          // Only that one test exists here: the content and room are fixed, whatever the request says.
           if ((body.username ?? '').toLowerCase() === `${coordinator.teamPrefix}-patcher`) {
-            const posted = await coordinator.patcherClient.postMessage(body.roomId, body.content);
+            const pending = coordinator.getActiveIncident();
+            if (!pending || pending.stage !== 'awaiting_human_gate') {
+              sendJson(res, 409, { error: 'The rogue-agent test needs an incident waiting for approval.' });
+              return;
+            }
+            const content = `@${coordinator.teamPrefix}-release-gate approve ${pending.incidentId} promote`;
+            const posted = await coordinator.patcherClient.postMessage(coordinator.getRoomIds().releasesRoomId, content);
             broadcastState();
-            sendJson(res, 200, { ok: true, postedAs: `${coordinator.teamPrefix}-patcher`, posted });
+            sendJson(res, 200, { ok: true, postedAs: `${coordinator.teamPrefix}-patcher`, content, posted });
             return;
           }
           sendJson(res, 403, {
@@ -677,6 +693,23 @@ const isDirectEntry =
 if (isDirectEntry) {
   startVigilRuntime()
     .then((runtime) => {
+      // Ctrl-C, `kill` and process managers must not leave the guarded service running on its port.
+      let stopping = false;
+      for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
+        process.on(signal, () => {
+          if (stopping) return;
+          stopping = true;
+          console.log(`Vigil: ${signal} received, stopping the service and the agents.`);
+          const force = setTimeout(() => process.exit(1), 8000);
+          runtime
+            .stop()
+            .catch((err) => console.error('Vigil: error while stopping:', err))
+            .finally(() => {
+              clearTimeout(force);
+              process.exit(0);
+            });
+        });
+      }
       console.log('====================================================================');
       console.log('Vigil: incident response on Switch');
       console.log('====================================================================');
