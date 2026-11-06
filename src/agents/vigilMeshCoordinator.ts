@@ -477,7 +477,7 @@ export class VigilMeshCoordinator {
         name: 'release-safety-policy',
         description: 'The rules the release gate checks before shipping',
         instructions: 'Read on every approval. People change it from chat; agents cannot.',
-        content: ReleaseSafetyGate.renderPolicyDocument(DEFAULT_RELEASE_POLICY),
+        content: ReleaseSafetyGate.renderPolicyDocument(DEFAULT_RELEASE_POLICY, undefined, this.teamPrefix),
       });
       return;
     }
@@ -570,7 +570,7 @@ export class VigilMeshCoordinator {
       `# ${alert.incidentId}: what broke`,
       `- **Status:** open, handed to #${this.teamPrefix}-hotfix`,
       `- **Service:** ${alert.service} \`${alert.deployedVersion}\` (last good: \`${alert.lastKnownGoodVersion}\`)`,
-      `- **Endpoint:** \`${alert.endpoint}\` returns HTTP ${alert.httpStatus} (${alert.errorRatePct}% errors, p99 ${alert.p99LatencyMs} ms)`,
+      `- **Endpoint:** \`${alert.endpoint}\` ${alert.httpStatus ? `returns HTTP ${alert.httpStatus}` : 'is failing'} (${alert.errorRatePct}% errors, p99 ${alert.p99LatencyMs} ms, measured by the service)`,
       `- **Suspect commit:** \`${alert.suspectedCommit.sha}\` by \`${alert.suspectedCommit.author}\`: ${alert.suspectedCommit.message} (\`${alert.suspectedCommit.filePath}:${alert.suspectedCommit.line}\`)`,
       `- **Stack trace:**`,
       '```',
@@ -592,7 +592,7 @@ export class VigilMeshCoordinator {
       incRoomId,
       [
         `**${alert.incidentId}, SEV-1: ${spec.title}**`,
-        `- \`${alert.endpoint}\` returns HTTP ${alert.httpStatus} on \`${alert.deployedVersion}\`: ${alert.errorRatePct}% errors, p99 ${alert.p99LatencyMs} ms.`,
+        `- \`${alert.endpoint}\` ${alert.httpStatus ? `returns HTTP ${alert.httpStatus}` : 'is failing'} on \`${alert.deployedVersion}\`: ${alert.errorRatePct}% errors, p99 ${alert.p99LatencyMs} ms.`,
         `- Suspect commit \`${alert.suspectedCommit.sha}\` at \`${alert.suspectedCommit.filePath}:${alert.suspectedCommit.line}\`: ${alert.suspectedCommit.message}.`,
         `- I hold \`incident-commander\` and wrote \`blast-radius-dossier\`. Escalating to #${this.teamPrefix}-hotfix.`,
       ].join('\n'),
@@ -633,10 +633,10 @@ export class VigilMeshCoordinator {
         `@${patcherHandle}${external ? ` @${coder}` : ''} **[ESCALATE ${alert.incidentId} scenario=${alert.scenarioId} mode=${record.patchMode}]**`,
         external
           ? `@${coder}: you hold \`patch-author\` for this incident. Reproduce with the payload below against \`${this.opts.checkoutService.getBaseUrl()}/api/checkout\`, then fix it in the live working copy \`${this.opts.checkoutService.getWorkDir()}\` (HEAD is the regression commit). Hand off either by editing the files there and posting \`@${patcherHandle} verify ${alert.incidentId}\`, or by posting your unified diff in a \`\`\`diff block addressed to @${patcherHandle} (or \`POST /api/incidents/${alert.incidentId}/stage-patch\`). @${patcherHandle} verifies with the real test suite as \`red-team-verifier\`.`
-          : `Reproduce & stage surgical fix for \`${alert.service}\` (\`${alert.deployedVersion}\`):`,
+          : `Reproduce and fix \`${alert.service}\` (\`${alert.deployedVersion}\`):`,
         `- **Exception:** \`${alert.errorMessage}\``,
         `- **Suspect:** \`${alert.suspectedCommit.sha}\` at \`${alert.suspectedCommit.filePath}:${alert.suspectedCommit.line}\``,
-        `- **Repro Payload:** \`${JSON.stringify(alert.reproductionPayload)}\``,
+        `- **Failing request:** \`${JSON.stringify(alert.reproductionPayload)}\`${spec.reproAttempts > 1 ? ` (send it up to ${spec.reproAttempts} times; the fault needs repeated requests to show)` : ''}`,
         record.workroom ? `- **Workroom:** \`#${record.workroom.roomName}\` (linked from \`#${this.teamPrefix}-hotfix\`)` : '',
       ]
         .filter(Boolean)
@@ -736,15 +736,24 @@ export class VigilMeshCoordinator {
         const version = resolvedMatch[3];
         const rec = this.incidents.get(incId);
 
+        const canary = rec?.canaryReport;
+        const canaryLine = canary
+          ? `${canary.probesPassed} of ${canary.probesRun} canary probes passed`
+          : 'no canary report';
         if (rec) {
+          // Keep the investigation: append the closure to the dossier rather than replacing it.
+          const docs = await this.sentinelClient.loadInternalDocuments(this.roomsByRole.incidentsRoomId).catch(() => []);
+          const current = docs.find((d) => d.name === 'blast-radius-dossier')?.content ?? `# ${incId}`;
           await this.sentinelClient.updateRoomDocument(
             this.roomsByRole.incidentsRoomId,
             'blast-radius-dossier',
             [
-              `# ${incId}: closed`,
+              current.replace(/\n## Closed[\s\S]*$/, '').trimEnd(),
+              '',
+              '## Closed',
               `- **Outcome:** ${mode === 'promote' ? `fix shipped as \`${version}\`` : `rolled back to \`${version}\``}`,
               `- **Closed at:** ${new Date().toISOString()}`,
-              `- **After the deploy:** every canary probe passed`,
+              `- **After the deploy:** ${canaryLine}`,
             ].join('\n'),
           );
         }
@@ -756,7 +765,7 @@ export class VigilMeshCoordinator {
         await this.sentinelClient.releaseRole(this.roomsByRole.incidentsRoomId, 'incident-commander');
         await this.sentinelClient.postMessage(
           this.roomsByRole.incidentsRoomId,
-          `**${incId} closed.** \`${version}\` is healthy. I updated \`blast-radius-dossier\`${rec?.workroom ? `, archived #${rec.workroom.roomName}` : ''} and released \`incident-commander\`.`,
+          `**${incId} closed.** \`${version}\` is live; ${canaryLine}. I updated \`blast-radius-dossier\`${rec?.workroom ? `, archived #${rec.workroom.roomName}` : ''} and released \`incident-commander\`.`,
         );
         this.opts.onEventUpdate?.();
         return;
@@ -817,7 +826,7 @@ export class VigilMeshCoordinator {
             hotfixRoomId,
             [
               `**${incidentId}: waiting for @${coder}.** \`patch-author\` is theirs; I hold \`red-team-verifier\` and will check their change.`,
-              alert ? `Reproduced independently on \`${alert.deployedVersion}\`: \`${alert.errorMessage}\`` : '',
+              alert ? `The alert on \`${alert.deployedVersion}\` reports \`${alert.errorMessage}\`; I reproduce it myself when I check your change.` : '',
               `@${coder}: edit the working copy and reply \`@${this.patcherClient.agentName} verify ${incidentId}\`, or send a diff (in a \`\`\`diff block, or \`POST ${this.opts.checkoutService.getBaseUrl().replace(/:\d+$/, ':' + (process.env.VIGIL_PORT || '4010'))}/api/incidents/${incidentId}/stage-patch\`). Only a passing change goes on to #${this.teamPrefix}-releases.`,
             ]
               .filter(Boolean)
@@ -991,7 +1000,7 @@ export class VigilMeshCoordinator {
       [
         `**${incidentId}: fix verified**${external ? `, written by ${verification.author}` : ''}.`,
         `1. Reproduced on the live service: \`${verification.reproErrorOutput}\``,
-        `2. Candidate \`${verification.candidateVersion}\`, commit \`${verification.candidateSha ?? 'n/a'}\`: ${verification.changedLines} changed lines in \`${verification.touchedFiles[0] ?? 'n/a'}\`. Not deployed yet.`,
+        `2. Candidate \`${verification.candidateVersion}\`, commit \`${verification.candidateSha ?? 'n/a'}\`: ${verification.changedLines} changed lines in ${verification.touchedFiles.map((f) => `\`${f}\``).join(', ') || 'no files'}. Not deployed yet.`,
         '```diff',
         verification.diffUnified,
         '```',
@@ -1028,7 +1037,7 @@ export class VigilMeshCoordinator {
 
   private async writeReleasePolicy(policy: ReleasePolicy, changedBy: string): Promise<void> {
     const roomId = this.roomsByRole.releasesRoomId;
-    const content = ReleaseSafetyGate.renderPolicyDocument(policy, changedBy);
+    const content = ReleaseSafetyGate.renderPolicyDocument(policy, changedBy, this.teamPrefix);
     try {
       await this.releaseGateClient.updateRoomDocument(roomId, 'release-safety-policy', content);
     } catch {
@@ -1216,7 +1225,7 @@ export class VigilMeshCoordinator {
           [
             `**Policy updated by ${event.payload.sender_name}:** ${policyCmd.summary}`,
             `Saved to the \`release-safety-policy\` room document. It applies from the next approval.`,
-            `- max_changed_lines: \`${next.maxChangedLines}\` · forbidden_paths: \`${next.forbiddenPaths.join(', ') || 'none'}\` · require_green_matrix: \`${next.requireGreenMatrix}\` · allowed_approvers: \`${next.allowedApprovers.join(', ')}\``,
+            `- max_changed_lines: \`${next.maxChangedLines}\` · forbidden_paths: \`${next.forbiddenPaths.join(', ') || 'none'}\` · require_green_matrix: \`${next.requireGreenMatrix}\` · allowed_approvers: \`${next.allowedApprovers.join(', ')}\` · min_canary_probes: \`${next.minCanaryProbes}\``,
           ].join('\n'),
         );
         return;
@@ -1242,6 +1251,17 @@ export class VigilMeshCoordinator {
       // 2. Evaluate an approval or rollback with the release gate (plain code, no model)
       const active = this.getActiveIncident();
       if (!active || active.resolvedAt !== null) {
+        if (/\b(approve|ship|execute|rollback)\b/i.test(body)) {
+          const cited = body.match(/INC-[0-9A-Z-]+/i)?.[0]?.toUpperCase();
+          const closed = cited ? this.incidents.get(cited) : undefined;
+          await this.releaseGateClient.postMessage(
+            event.room_id,
+            closed
+              ? `**Nothing to do.** ${cited} is already ${closed.stage.replace(/_/g, ' ')}${closed.finalVersion ? ` (\`${closed.finalVersion}\`)` : ''}.`
+              : `**Nothing is waiting for approval.** ${cited ? `${cited} is not an open incident.` : 'There is no open incident.'}`,
+          );
+          return;
+        }
         if (/\b(status|help)\b/i.test(body)) {
           const pol = this.releasePolicy;
           await this.releaseGateClient.postMessage(
@@ -1264,6 +1284,7 @@ export class VigilMeshCoordinator {
           knownAgentParticipantIds: this.knownAgentParticipantIds,
           knownAgentNames: this.knownAgentNames,
           patchVerification: active.patchVerification,
+          lastKnownGoodVersion: active.alert.lastKnownGoodVersion,
           policy,
         });
 
@@ -1291,6 +1312,25 @@ export class VigilMeshCoordinator {
         );
         const outcome = await this.opts.checkoutService.applyApprovedRelease(decision.action);
         active.canaryReport = outcome.canaryReport;
+        const report = outcome.canaryReport;
+        const canaryOk =
+          report.probesRun > 0 && report.probesPassed === report.probesRun && report.probesPassed >= policy.minCanaryProbes;
+        if (!canaryOk) {
+          // The deploy happened, but the service is not proven healthy: the incident stays open for a person.
+          this.opts.onEventUpdate?.();
+          await this.releaseGateClient.postMessage(
+            event.room_id,
+            [
+              `**${active.incidentId}: not closing.** \`${outcome.deployedVersion}\` is running, but ${report.probesPassed} of ${report.probesRun} canary probes passed (the policy needs all of them, and at least ${policy.minCanaryProbes}).`,
+              ...report.details.filter((d) => !/\bOK\b/.test(d)).map((d) => `- ${d}`),
+              decision.action === 'promote'
+                ? `Roll back with \`@${this.teamPrefix}-release-gate approve ${active.incidentId} rollback\`, or ship another fix.`
+                : 'The last good release is not healthy either; this needs a person to look at the service.',
+            ].join('\n'),
+          );
+          return;
+        }
+        this.opts.checkoutService.settleRelease();
         active.finalVersion = outcome.deployedVersion;
         active.resolvedAt = Date.now();
         active.stage =
@@ -1345,7 +1385,7 @@ export class VigilMeshCoordinator {
         await this.releaseGateClient.sendTargetedMessage(
           targetIncidentsRoomId,
           sentinelHandle,
-          `@${sentinelHandle} **[RESOLVED ${active.incidentId} mode=${decision.action} version=${outcome.deployedVersion}]** Approved by ${event.payload.sender_name}; 5/5 canary probes green.`,
+          `@${sentinelHandle} **[RESOLVED ${active.incidentId} mode=${decision.action} version=${outcome.deployedVersion}]** Approved by ${event.payload.sender_name}; ${report.probesPassed} of ${report.probesRun} canary probes passed.`,
         );
       }
     });
