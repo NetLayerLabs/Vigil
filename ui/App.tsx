@@ -170,6 +170,8 @@ interface ObservatorySnapshot {
     activeInventoryLocks: number;
     maxInventoryLocks: number;
     status: 'healthy' | 'degraded';
+    /** False when the target has no metrics endpoint: error rate, p99 and request counts are not measured. */
+    metricsMeasured?: boolean;
   };
   switchState: {
     rooms: SwitchRoom[];
@@ -480,6 +482,9 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
   const gateInc = activeInc && activeInc.stage === 'awaiting_human_gate' ? activeInc : null;
   // On a live Switch server, humans speak (and approve) in the messaging app, not on this page.
   const isLive = snap.mode !== 'embedded_switch_protocol_server';
+  // The chat app the live rooms are bridged to, as the server reports it
+  const chatApp = isLive ? snap.switchState.rooms.find((r) => r.bridge && r.bridge !== 'no chat bridge')?.bridge ?? 'your chat app' : null;
+  const measured = telemetry.metricsMeasured !== false;
   const chatChannelUrl = (roomName: string): string | null =>
     snap.chatUrl ? `${snap.chatUrl.replace(/\/+$/, '')}/channels/${roomName.toLowerCase()}` : null;
   const gateMatrix = gateInc?.patchVerification?.testMatrix ?? [];
@@ -526,15 +531,15 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
           </span>
           <span className="wr-tm wr-tm--err">
             <small>5xx</small>
-            <b>{telemetry.errorRatePct}%</b>
+            <b>{measured ? `${telemetry.errorRatePct}%` : '—'}</b>
           </span>
           <span className="wr-tm">
             <small>p99</small>
-            <b>{telemetry.p99LatencyMs}ms</b>
+            <b>{measured ? `${telemetry.p99LatencyMs}ms` : '—'}</b>
           </span>
           <span className="wr-tm wr-tm--hide-md" title="Requests in the measured window (synthetic traffic + probes)">
             <small>req / 60s</small>
-            <b>{telemetry.windowRequests}</b>
+            <b>{measured ? telemetry.windowRequests : '—'}</b>
           </span>
           <span className="wr-tm wr-tm--hide-md" title="Service process id (changes on every deploy or rollback)">
             <small>pid</small>
@@ -674,8 +679,8 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
             <p>
               <b>{gateInc.incidentId}</b> {gateInc.title}. Candidate{' '}
               <code>{gateInc.patchVerification?.candidateVersion}</code> passed{' '}
-              {gateMatrix.filter((t) => t.passed).length}/{gateMatrix.length} tests and the staging replay. The gate
-              refuses approvals from agent identities.
+              {gateMatrix.filter((t) => t.passed).length} of {gateMatrix.length} checks (the service tests and a
+              staging replay). The gate refuses approvals from agents.
             </p>
           </div>
           <div className="wr-gate-actions">
@@ -703,7 +708,7 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
                 title={`Reply "@vigil-release-gate approve ${gateInc.incidentId} promote" (or rollback) in #vigil-releases`}
               >
                 <UserCheck className="wr-ic" />
-                <span>Approve in Mattermost</span>
+                <span>Approve in {chatApp}</span>
               </a>
             ) : (
               <>
@@ -716,7 +721,7 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
                 }}
               >
                 <RotateCcw className="wr-ic" />
-                <span>Rollback to v2.13.2</span>
+                <span>Rollback to {telemetry.lastKnownGoodVersion}</span>
               </button>
               <button
                 type="button"
@@ -837,7 +842,7 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
                 <span className="wr-sq" />
                 Linked Switch rooms
               </span>
-              <span className="wr-tag">{snap.switchState.rooms[0]?.bridge ?? 'Mattermost'}</span>
+              <span className="wr-tag">{isLive ? chatApp : 'Embedded, no chat app'}</span>
             </div>
             <div className="wr-rooms">
               {snap.switchState.rooms.map((room, idx) => (
@@ -856,7 +861,7 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
                             {room.archived ? 'archived' : 'workroom'}
                           </span>
                         )}
-                        <span className="wr-tag">seq {room.seq}</span>
+                        {room.seq > 0 && <span className="wr-tag">seq {room.seq}</span>}
                       </span>
                     </div>
                     <p className="wr-room-desc">{room.description}</p>
@@ -871,12 +876,21 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
                       </div>
                     )}
                   </button>
-                  {!room.ephemeral && idx < 2 && (
-                    <div className="wr-link">
-                      <ArrowDownRight className="wr-ic" />
-                      <span>{snap.switchState.links[idx]?.label ?? 'linked room escalation'}</span>
-                    </div>
-                  )}
+                  {(() => {
+                    // The link that leaves this room for the next room in the rail, matched by id
+                    const next = snap.switchState.rooms[idx + 1];
+                    const link =
+                      next &&
+                      snap.switchState.links.find(
+                        (l) => (l.from_room_id === room.id || !l.from_room_id) && l.to_room_id === next.id,
+                      );
+                    return !room.ephemeral && link ? (
+                      <div className="wr-link">
+                        <ArrowDownRight className="wr-ic" />
+                        <span>{link.label}</span>
+                      </div>
+                    ) : null;
+                  })()}
                 </React.Fragment>
               ))}
             </div>
@@ -976,7 +990,7 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
                   <p>{currentRoom.description}</p>
                 </div>
                 <span className="wr-label">
-                  Append-only · seq <b>{currentRoom.seq}</b>
+                  Append-only{currentRoom.seq > 0 && <> · seq <b>{currentRoom.seq}</b></>}
                 </span>
               </div>
 
@@ -1022,13 +1036,22 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
               {isLive ? (
                 <div className="wr-compose wr-compose--live">
                   <p>
-                    This room is mirrored to Mattermost. Humans post and approve there, so the server knows who
-                    said it. Reply <code>@vigil-release-gate approve INC-xxxx promote</code> in #vigil-releases.
+                    This room is mirrored to {chatApp}. People post and approve there, so the server knows who said
+                    it.{' '}
+                    {activeInc?.stage === 'awaiting_human_gate' ? (
+                      <>
+                        Reply <code>@vigil-release-gate approve {activeInc.incidentId} promote</code> in #vigil-releases.
+                      </>
+                    ) : (
+                      'Nothing is waiting for approval right now.'
+                    )}
                   </p>
                   {chatChannelUrl(currentRoom.name) && (
                     <a className="wr-btn wr-btn--dark" href={chatChannelUrl(currentRoom.name) ?? undefined} target="_blank" rel="noreferrer">
                       <Send className="wr-ic" />
-                      <span>Open #{currentRoom.name} in Mattermost</span>
+                      <span>
+                        Open #{currentRoom.name} in {chatApp}
+                      </span>
                     </a>
                   )}
                 </div>
@@ -1083,8 +1106,8 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
                     onChange={(e) => setOperatorHandle(e.target.value)}
                     aria-label="Post as"
                   >
-                    <option value="priya">Priya · Lead</option>
-                    <option value="sam">Sam · SRE</option>
+                    <option value="priya">Priya (test identity)</option>
+                    <option value="sam">Sam (test identity)</option>
                   </select>
                   <input
                     type="text"
@@ -1263,10 +1286,10 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
                       style={{ height: 32 }}
                       onClick={() =>
                         setExternalDiff(
-                          '--- a/src/services/cartPricing.ts\n+++ b/src/services/cartPricing.ts\n@@ -1,1 +1,1 @@\n-// TODO\n+// cosmetic comment only, does not fix the fault',
+                          'diff --git a/src/NOTES.md b/src/NOTES.md\nnew file mode 100644\n--- /dev/null\n+++ b/src/NOTES.md\n@@ -0,0 +1 @@\n+A note only. This change applies cleanly but does not fix the fault.\n',
                         )
                       }
-                      title="A diff that does not carry the fix: the verifier must reject it"
+                      title="A diff that applies cleanly but does not fix the fault: the verifier must reject it"
                     >
                       Load bad diff
                     </button>
@@ -1402,13 +1425,12 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
                           <b>Post-deploy canary</b>
                         </span>
                         <span className={`wr-tag ${latestInc.canaryReport.healthy ? 'wr-tag--brand' : 'wr-tag--alert'}`}>
-                          {latestInc.canaryReport.probesPassed}/{latestInc.canaryReport.probesRun} 200 OK
+                          {latestInc.canaryReport.probesPassed} of {latestInc.canaryReport.probesRun} passed
                         </span>
                       </div>
                       <pre className="vl-code wr-code wr-code--wrap">
                         {latestInc.canaryReport.details.map((line, i) => (
-                          <span key={i}>
-                            <span className="ok">✓ </span>
+                          <span key={i} className={/\bOK\b/.test(line) ? 'ok' : 'no'}>
                             {line}
                             {'\n'}
                           </span>
@@ -1483,6 +1505,28 @@ const FAULTS = [
  * elements (never raw HTML), so nothing in a message can inject markup.
  */
 function MessageBody({ text }: { text: string }) {
+  // Fenced blocks (```diff … ```) are code, not prose: split them out first.
+  const parts = text.replace(/\s+$/, '').split(/^```([a-z]*)[ \t]*\n([\s\S]*?)^```[ \t]*$/m);
+  if (parts.length > 1) {
+    const out: React.ReactNode[] = [];
+    for (let i = 0; i < parts.length; i += 3) {
+      if (parts[i].trim()) out.push(<MessageBody key={`t${i}`} text={parts[i]} />);
+      if (i + 2 < parts.length) {
+        const lang = parts[i + 1];
+        const code = parts[i + 2].replace(/\n$/, '');
+        out.push(
+          lang === 'diff' ? (
+            <DiffBlock key={`c${i}`} diff={code} />
+          ) : (
+            <pre key={`c${i}`} className="vl-code wr-code">
+              {code}
+            </pre>
+          ),
+        );
+      }
+    }
+    return <div className="wr-msg-body">{out}</div>;
+  }
   const blocks: Array<{ list: boolean; lines: string[] }> = [];
   for (const line of text.replace(/\s+$/, '').split('\n')) {
     const bullet = /^\s*[-*]\s+/.test(line);
