@@ -151,6 +151,8 @@ interface ObservatorySnapshot {
   mode: string;
   /** Live Switch server: the messaging app's team URL, where humans approve (`/channels/<room>`). */
   chatUrl?: string | null;
+  /** Public deployment: operator controls need the operator key. */
+  operatorKeyRequired?: boolean;
   switchServerUrl: string;
   checkoutBaseUrl: string;
   checkoutRepo: { workDir: string; log: Array<{ sha: string; author: string; message: string; at: number }> };
@@ -211,6 +213,49 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
   const [chatInput, setChatInput] = useState<string>('');
   const [operatorHandle, setOperatorHandle] = useState<string>('priya');
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  // Operator key for a public deployment, kept in this browser only.
+  const [operatorKey, setOperatorKey] = useState<string>(() => {
+    try {
+      return localStorage.getItem('vigil-operator-key') ?? '';
+    } catch {
+      return '';
+    }
+  });
+  const [notice, setNotice] = useState<string | null>(null);
+  useEffect(() => {
+    if (!notice) return;
+    const t = setTimeout(() => setNotice(null), 7000);
+    return () => clearTimeout(t);
+  }, [notice]);
+  const opHeaders = (extra: Record<string, string> = {}): Record<string, string> =>
+    operatorKey ? { ...extra, Authorization: `Bearer ${operatorKey}` } : extra;
+  /** Explain a refused request (locked control, open incident, cooldown) instead of failing silently. */
+  const reportRefusal = async (res: Response): Promise<boolean> => {
+    if (res.ok) return false;
+    const data = (await res.json().catch(() => ({}))) as { error?: string; operatorRequired?: boolean };
+    setNotice(
+      data.operatorRequired
+        ? 'That control is for the operator. Visitors can ship a chaos release and test the rogue-agent block.'
+        : (data.error ?? `Request failed (${res.status}).`),
+    );
+    return true;
+  };
+  const unlockOperator = async () => {
+    const key = window.prompt('Operator key')?.trim();
+    if (!key) return;
+    const res = await fetch('/api/operator/check', { headers: { Authorization: `Bearer ${key}` } });
+    if (!res.ok) {
+      setNotice('That operator key was not accepted.');
+      return;
+    }
+    try {
+      localStorage.setItem('vigil-operator-key', key);
+    } catch {
+      // private mode: keep it for this tab only
+    }
+    setOperatorKey(key);
+    setNotice('Operator controls unlocked in this browser.');
+  };
   const [showTemplateModal, setShowTemplateModal] = useState<boolean>(false);
   const [templateYaml, setTemplateYaml] = useState<string>('');
   const [copiedYaml, setCopiedYaml] = useState<boolean>(false);
@@ -303,11 +348,12 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
     setMobileView('room');
     setBusyAction(scenarioId);
     try {
-      await fetch('/api/chaos/inject', {
+      const res = await fetch('/api/chaos/inject', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: opHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ scenarioId }),
       });
+      if (await reportRefusal(res)) return;
       if (snap?.roomIds.incidentsRoomId) {
         setSelectedRoomId(snap.roomIds.incidentsRoomId);
       }
@@ -357,11 +403,12 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
   const setPatchMode = async (mode: 'auto' | 'external') => {
     setBusyAction('patch-mode');
     try {
-      await fetch('/api/patch-mode', {
+      const res = await fetch('/api/patch-mode', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: opHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ mode }),
       });
+      await reportRefusal(res);
     } finally {
       setBusyAction(null);
     }
@@ -372,7 +419,8 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
     setMobileView('room');
     setBusyAction(path);
     try {
-      await fetch(path, { method: 'POST' });
+      const res = await fetch(path, { method: 'POST', headers: opHeaders() });
+      if (await reportRefusal(res)) return;
       if (snap?.roomIds.incidentsRoomId) setSelectedRoomId(snap.roomIds.incidentsRoomId);
     } finally {
       setBusyAction(null);
@@ -380,7 +428,8 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
   };
 
   const loadReferenceFix = async (incidentId: string) => {
-    const res = await fetch(`/api/incidents/${incidentId}/reference-fix`);
+    const res = await fetch(`/api/incidents/${incidentId}/reference-fix`, { headers: opHeaders() });
+    if (await reportRefusal(res)) return;
     if (res.ok) {
       const data = await res.json();
       setExternalDiff(data.diffUnified ?? '');
@@ -394,9 +443,13 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
     try {
       const res = await fetch(`/api/incidents/${incidentId}/stage-patch`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: opHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ diffUnified: externalDiff, author: externalAuthor || 'claude-code' }),
       });
+      if (res.status === 401) {
+        await reportRefusal(res);
+        return;
+      }
       const data = await res.json();
       setStageResult(data.next ?? data.error ?? (res.ok ? 'Accepted' : 'Rejected'));
       if (snap?.roomIds.hotfixRoomId) setSelectedRoomId(snap.roomIds.hotfixRoomId);
@@ -492,6 +545,17 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
         </div>
 
         <div className="wr-top-actions">
+          {snap.operatorKeyRequired && (
+            <button
+              type="button"
+              className={`wr-btn wr-desk ${operatorKey ? 'wr-btn--brand' : ''}`}
+              onClick={unlockOperator}
+              title={operatorKey ? 'Operator controls unlocked in this browser' : 'Unlock the operator controls'}
+            >
+              <Lock className="wr-ic" />
+              <span>{operatorKey ? 'Operator' : 'Operator key'}</span>
+            </button>
+          )}
           <button type="button" className="wr-btn wr-desk" onClick={openTemplatesModal}>
             <Code2 className="wr-ic" />
             <span>Switch template</span>
@@ -748,6 +812,19 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
                 <Code2 className="wr-ic" />
                 <span>Switch template</span>
               </button>
+              {snap.operatorKeyRequired && (
+                <button
+                  type="button"
+                  className="wr-btn"
+                  onClick={() => {
+                    setDrawerOpen(false);
+                    unlockOperator();
+                  }}
+                >
+                  <Lock className="wr-ic" />
+                  <span>{operatorKey ? 'Operator unlocked' : 'Operator key'}</span>
+                </button>
+              )}
               {onHome && (
                 <button type="button" className="wr-btn wr-btn--dark" onClick={onHome}>
                   <ArrowLeft className="wr-ic" />
@@ -1340,6 +1417,15 @@ export function App({ onHome }: { onHome?: () => void } = {}) {
           )}
         </section>
       </main>
+
+      {notice && (
+        <div className="wr-toast" role="status">
+          <span>{notice}</span>
+          <button type="button" aria-label="Dismiss" onClick={() => setNotice(null)}>
+            <X className="wr-ic" />
+          </button>
+        </div>
+      )}
 
       {/* ───────────── Switch template modal ───────────── */}
       {showTemplateModal && (
