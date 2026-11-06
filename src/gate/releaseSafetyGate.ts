@@ -3,6 +3,8 @@ import { PatchVerificationResult } from '../services/checkoutTarget.js';
 export interface ReleaseApprovalAttempt {
   senderParticipantId: string;
   senderName: string;
+  /** Who the server says sent it: `user` (a human on a bridge), `agent` or `platform`. Absent on the embedded server. */
+  senderKind?: string | null;
   messageBody: string;
   activeIncidentId: string;
   knownAgentParticipantIds: Set<string>;
@@ -217,6 +219,8 @@ export class ReleaseSafetyGate {
     // Display name with any trailing qualifier stripped, e.g. `vigil-patcher (Rogue Agent Test)` -> `vigil-patcher`
     const senderNameStem = lowerSenderName.replace(/\s*[([].*$/, '').trim();
     const isAgentSender =
+      // The server's own word wins: anything it does not mark as a human user cannot approve.
+      (attempt.senderKind != null && attempt.senderKind !== 'user') ||
       lowerSenderId.startsWith('@switch-agent-') ||
       attempt.knownAgentParticipantIds.has(attempt.senderParticipantId) ||
       attempt.knownAgentNames.has(lowerSenderName) ||
