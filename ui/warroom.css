@@ -248,6 +248,10 @@
 .wr-msg pre { font-family: var(--sans); font-size: 13.5px; line-height: 1.62; color: var(--soft); white-space: pre-wrap; word-break: break-word; }
 
 .wr-compose { flex-shrink: 0; padding: 12px 24px 16px; border-top: 1px solid var(--line); background: var(--bg); }
+.wr-compose--live { display: flex; align-items: center; gap: 16px; justify-content: space-between; flex-wrap: wrap; }
+.wr-compose--live p { margin: 0; flex: 1 1 280px; font-size: 13px; line-height: 1.5; color: var(--muted, #555); }
+.wr-compose--live code { font-family: var(--mono); font-size: 12px; background: var(--code-bg); padding: 1px 5px; }
+a.wr-btn { text-decoration: none; }
 .wr-quick { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 10px; }
 .wr-quick .wr-label { margin-right: 4px; }
 .wr-inputrow { display: flex; gap: 8px; }
