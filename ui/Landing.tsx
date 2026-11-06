@@ -24,6 +24,8 @@ interface LiveSnapshot {
     deployedVersion: string;
     status: 'healthy' | 'degraded';
     errorRatePct: number;
+    /** False when the target has no metrics endpoint. */
+    metricsMeasured?: boolean;
     p99LatencyMs: number;
     pid?: number;
     windowRequests?: number;
@@ -216,7 +218,7 @@ export function Landing({ onLaunch }: { onLaunch: () => void }) {
               onLaunch();
             }}
           >
-            <span>Launch App</span>
+            <span>Open the War Room</span>
             <span className="vl-btn-icon">
               <ArrowRight />
             </span>
@@ -312,7 +314,7 @@ export function Landing({ onLaunch }: { onLaunch: () => void }) {
                 <div className="vl-status-row">
                   <span>5xx / p99</span>
                   <span className="tnum">
-                    {t.errorRatePct}% · {fmtMs(t.p99LatencyMs)}
+                    {t.metricsMeasured === false ? 'not measured' : `${t.errorRatePct}% · ${fmtMs(t.p99LatencyMs)}`}
                   </span>
                 </div>
                 <div className="vl-status-row">
@@ -386,7 +388,7 @@ export function Landing({ onLaunch }: { onLaunch: () => void }) {
             <div className="vl-human vl-fade" data-reveal="" style={{ ['--d' as string]: '0.35s' }}>
               <span className="vl-square" aria-hidden="true" />
               <span>
-                <b>@priya</b> types <span className="vl-code-inline">approve INC-2041 promote</span>
+                <b>A teammate</b> types <span className="vl-code-inline">approve INC-2041 promote</span>
               </span>
             </div>
           </div>
@@ -429,7 +431,7 @@ export function Landing({ onLaunch }: { onLaunch: () => void }) {
                 <ProofRow
                   layer="Seeded"
                   seeded
-                  what="The three regression patches, and in Mode A the embedded Switch protocol server. Mode B uses a real Switch Console server."
+                  what="The three regression patches, and in Mode A the embedded Switch protocol server. Mode B uses a real Switch server."
                 />
               </tbody>
             </table>
@@ -439,7 +441,7 @@ export function Landing({ onLaunch }: { onLaunch: () => void }) {
             <div className="vl-live-head">
               <span>
                 <span className={`vl-dot ${!snap ? 'vl-dot--off' : t?.status === 'degraded' ? 'vl-dot--alert' : ''}`} />
-                Live from this machine
+                Live from the running instance
               </span>
               <span>{t?.pid ? `pid ${t.pid}` : ''}</span>
             </div>
@@ -455,12 +457,12 @@ export function Landing({ onLaunch }: { onLaunch: () => void }) {
                   <div className="vl-stat">
                     <div className="vl-stat-label">5xx · 60s</div>
                     <div className="vl-stat-value" style={{ color: t.errorRatePct > 2 ? 'var(--alert)' : undefined }}>
-                      {t.errorRatePct}%
+                      {t.metricsMeasured === false ? '—' : `${t.errorRatePct}%`}
                     </div>
                   </div>
                   <div className="vl-stat">
                     <div className="vl-stat-label">Requests · 60s</div>
-                    <div className="vl-stat-value">{t.windowRequests ?? '–'}</div>
+                    <div className="vl-stat-value">{t.metricsMeasured === false ? '—' : (t.windowRequests ?? '–')}</div>
                   </div>
                 </div>
                 <ul className="vl-gitlog" aria-label="git log of the live working copy">
@@ -478,8 +480,8 @@ export function Landing({ onLaunch }: { onLaunch: () => void }) {
             ) : (
               <div className="vl-live-empty">
                 {offline
-                  ? 'The Vigil runtime is not reachable from this page. Run npm start and reload to see the live git log, process id and measured error rate here.'
-                  : 'Connecting to the local runtime…'}
+                  ? 'The Vigil runtime behind this page is not answering right now, so no live data is shown. Running it yourself? Start it with npm start and reload.'
+                  : 'Connecting to the runtime…'}
               </div>
             )}
           </div>
@@ -580,7 +582,7 @@ export function Landing({ onLaunch }: { onLaunch: () => void }) {
 
           <div className="vl-fade" data-reveal="" style={{ ['--d' as string]: '0.12s' }}>
             <div className="vl-code-title">
-              <span>#vigil-hotfix</span>
+              <span>#vigil-hotfix · example</span>
               <i>
                 <b />
                 <b />
@@ -646,7 +648,7 @@ export function Landing({ onLaunch }: { onLaunch: () => void }) {
             <thead>
               <tr>
                 <th>Rule</th>
-                <th>Enforced value{policy ? ' · live' : ''}</th>
+                <th>Enforced value{policy ? ' · live' : ' (defaults, runtime not reachable)'}</th>
                 <th>Change it from chat</th>
                 <th>On violation</th>
               </tr>
@@ -781,7 +783,7 @@ export function Landing({ onLaunch }: { onLaunch: () => void }) {
               {'\n'}
               <span className="p">$ </span>npm run build && npm start
               {'\n\n'}
-              <span className="c"># open http://localhost:4010, then Launch App</span>
+              <span className="c"># open http://localhost:4010, then Open the War Room</span>
               {'\n'}
               <span className="c"># click a chaos button, watch the git log and pid change</span>
             </pre>
@@ -866,7 +868,7 @@ export function Landing({ onLaunch }: { onLaunch: () => void }) {
               onLaunch();
             }}
           >
-            Launch App
+            Open the War Room
           </a>
         </nav>
       </footer>
@@ -938,11 +940,11 @@ const STEPS: Array<{ title: string; body: string; room: string; op: string; arti
 ];
 
 const MODE_B = [
-  { t: 'Install Switch Console', b: 'Run scripts/install-switch-console.sh, then start a local server with bundled Mattermost.' },
-  { t: 'Create a registration key', b: 'In the Switch Gateway, open API Keys and create a key of type registration.' },
+  { t: 'Run a Switch server', b: 'Switch Console on your machine, or the Switch Docker Compose stack on a host you control, with a chat app such as Mattermost.' },
+  { t: 'Create a registration key', b: 'In the Switch dashboard, open API Keys and create a registration key.' },
   { t: 'Onboard the three agents', b: 'SWITCH_SERVER_URL=… SWITCH_REGISTRATION_KEY=… npm run onboard:switch' },
-  { t: 'Import the template', b: 'Templates, Import, then templates/vigil-war-room.template.yaml. Pick your chat bridge.' },
-  { t: 'Start and approve from chat', b: 'npm run dev, break something, and type approve in Mattermost, Discord, Telegram or Slack.' },
+  { t: 'Start Vigil', b: 'npm start. On first start it creates the three linked rooms, their roles, documents and links.' },
+  { t: 'Approve from chat', b: 'Break something, then type approve in your chat app. Only a person can.' },
 ];
 
 const FAQ = [
@@ -1026,4 +1028,3 @@ function ProofRow({ layer, what, seeded }: { layer: string; what: string; seeded
   );
 }
 
-/** Dawn coastline with a lighthouse sweeping its beam. Pure SVG + CSS, no images. */
