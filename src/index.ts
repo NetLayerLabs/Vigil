@@ -17,6 +17,23 @@ const MIME_TYPES: Record<string, string> = {
   '.ico': 'image/x-icon',
 };
 
+/** A room as the War Room renders it, built from a live Switch server's operations. */
+interface LiveRoomView {
+  id: string;
+  name: string;
+  description: string;
+  instructions: string;
+  bridge: string;
+  channel_type: string;
+  archived: boolean;
+  ephemeral: boolean;
+  roles: Array<{ name: string; exclusive: boolean; instructions: string; holder_name: string | null }>;
+  documents: unknown[];
+  links: unknown[];
+  seq: number;
+  messages: Array<Record<string, unknown>>;
+}
+
 export async function startVigilRuntime(opts: {
   vigilPort?: number;
   checkoutPort?: number;
@@ -93,7 +110,8 @@ export async function startVigilRuntime(opts: {
         : undefined,
     checkoutService,
     preRegisteredCreds,
-    provisionTemplateViaApi: Boolean(embeddedSwitch) || process.env.PROVISION_TEMPLATE === 'true',
+    // The embedded server is provisioned over HTTP; a real Switch server through `create_room_from_yaml`.
+    provisionTemplateViaApi: Boolean(embeddedSwitch),
     onEventUpdate: () => broadcastState(),
   });
 
@@ -102,38 +120,74 @@ export async function startVigilRuntime(opts: {
   // 4. Start Vigil Observatory HTTP + Live Stream Server
   const uiClients = new Set<WebSocket>();
 
+  // Live Switch server only: Vigil's rooms as the War Room shows them, read at most every 2s.
+  let liveRoomsCache: { at: number; rooms: Promise<LiveRoomView[]> } | null = null;
+  const readLiveRooms = (): Promise<LiveRoomView[]> => {
+    if (liveRoomsCache && Date.now() - liveRoomsCache.at < 2000) return liveRoomsCache.rooms;
+    const rooms = (async () => {
+      const reader = coordinator.releaseGateClient;
+      const listed = await reader.listRooms();
+      const team = `${coordinator.teamPrefix}-`;
+      const workrooms = listed.filter((r) => r.name.startsWith('hotfix-')).slice(-3);
+      const mine = [...listed.filter((r) => r.name.startsWith(team)), ...workrooms];
+      return Promise.all(
+        mine.map(async (r): Promise<LiveRoomView> => {
+          const [detail, documents, links, ctx] = await Promise.all([
+            reader.getRoomDetail(r.id).catch(() => null),
+            reader.loadInternalDocuments(r.id).catch(() => []),
+            reader.listLinkedRooms(r.id).catch(() => []),
+            reader.readContext(r.id, 40).catch(() => ({ messages: [] as never[] })),
+          ]);
+          const d = (detail ?? {}) as unknown as {
+            description?: string;
+            instructions?: string;
+            archived?: boolean;
+            channel_type?: string;
+            bridge_display_name?: string;
+            roles?: Array<{ name: string; exclusive: boolean; held_by?: Array<string | { name?: string }>; instructions_preview?: string }>;
+          };
+          return {
+            id: r.id,
+            name: r.name,
+            description: d.description ?? '',
+            instructions: d.instructions ?? '',
+            bridge: d.bridge_display_name ?? 'Mattermost',
+            channel_type: d.channel_type ?? 'channel_public',
+            archived: Boolean(d.archived ?? (r as { archived?: boolean }).archived),
+            ephemeral: r.name.startsWith('hotfix-'),
+            roles: (d.roles ?? []).map((role) => {
+              const holder = role.held_by?.[0];
+              return {
+                name: role.name,
+                exclusive: role.exclusive,
+                instructions: role.instructions_preview ?? '',
+                holder_name: holder ? (typeof holder === 'string' ? holder : (holder.name ?? null)) : null,
+              };
+            }),
+            documents,
+            links,
+            seq: ctx.messages.length,
+            messages: ctx.messages.map((m) => ({ ...m, room_id: r.id, room_name: r.name })),
+          };
+        }),
+      );
+    })();
+    liveRoomsCache = { at: Date.now(), rooms };
+    rooms.catch(() => {
+      liveRoomsCache = null;
+    });
+    return rooms;
+  };
+
   const buildObservatorySnapshot = async () => {
     let switchSnapshot;
     if (embeddedSwitch) {
       switchSnapshot = embeddedSwitch.getSnapshot();
     } else {
-      // Live Switch Server mode: query room details & recent messages via SwitchAgentClient ops!
-      const roomList = await coordinator.sentinelClient.listRooms();
-      const patcherRooms = await coordinator.patcherClient.listRooms();
-      const byId = new Map<string, typeof roomList[number]>();
-      for (const r of [...roomList, ...patcherRooms]) byId.set(r.id, r);
-
-      const roomsWithMessages = await Promise.all(
-        Array.from(byId.values()).map(async (r) => {
-          try {
-            const client = r.name.includes('hotfix')
-              ? coordinator.patcherClient
-              : coordinator.sentinelClient;
-            const ctx = await client.readContext(r.id, 40);
-            return {
-              ...ctx.room,
-              messages: ctx.messages.map((m) => ({
-                ...m,
-                room_id: r.id,
-                room_name: r.name,
-              })),
-            };
-          } catch {
-            return { ...r, messages: [] };
-          }
-        }),
-      );
-
+      // Live Switch server: read Vigil's rooms (details, roles, documents, links, recent messages)
+      // through the release gate's connection, the least busy agent. Cached briefly, because the
+      // live view rebuilds on every event.
+      const roomsWithMessages = await readLiveRooms();
       const links = roomsWithMessages.flatMap((r) => r.links ?? []);
       switchSnapshot = {
         rooms: roomsWithMessages,
@@ -185,6 +239,8 @@ export async function startVigilRuntime(opts: {
       activeIncident: coordinator.getActiveIncident(),
       wireTraces: coordinator.getWireTraces().slice(0, 80),
       roomIds: coordinator.getRoomIds(),
+      // Live Switch server: humans approve in the messaging app; this is where to send them.
+      chatUrl: embeddedSwitch ? null : process.env.VIGIL_CHAT_URL || null,
       patchMode: coordinator.getPatchMode(),
       externalCoderHandle: coordinator.getExternalCoderHandle(),
       releasePolicy: coordinator.getReleasePolicy(),
@@ -390,9 +446,18 @@ export async function startVigilRuntime(opts: {
           sendJson(res, forwardRes.status, result);
           return;
         } else {
-          sendJson(res, 400, {
-            error:
-              'Connected to live external Switch Server: post human messages directly in Mattermost, Discord, Telegram, or Slack!',
+          // Live Switch server. The rogue-agent test is real: the patcher agent posts the approval under
+          // its own identity and the release gate must refuse it. Nothing here may speak as a human, so
+          // human approvals happen in the messaging app.
+          if ((body.username ?? '').toLowerCase() === `${coordinator.teamPrefix}-patcher`) {
+            const posted = await coordinator.patcherClient.postMessage(body.roomId, body.content);
+            broadcastState();
+            sendJson(res, 200, { ok: true, postedAs: `${coordinator.teamPrefix}-patcher`, posted });
+            return;
+          }
+          sendJson(res, 403, {
+            error: 'Live Switch server: approvals come from a human in the messaging app, not from this page.',
+            chatUrl: process.env.VIGIL_CHAT_URL || null,
           });
           return;
         }
