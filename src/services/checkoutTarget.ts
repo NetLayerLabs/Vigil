@@ -8,7 +8,7 @@
  * from the real request stream (a built-in synthetic traffic generator keeps that stream alive).
  */
 import { ChildProcess, spawn } from 'node:child_process';
-import { execFile } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { promisify } from 'node:util';
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createServer, IncomingMessage, Server as HttpServer } from 'node:http';
@@ -16,6 +16,28 @@ import path from 'node:path';
 import { randomBytes } from 'node:crypto';
 
 const execFileAsync = promisify(execFile);
+
+/**
+ * How the target service, its tests and its staging copy are run. They execute candidate code,
+ * which an external coding agent may have written, so on a shared host they should not run as the
+ * user that runs Vigil or see its secrets:
+ * - VIGIL_SERVICE_USER: run them as this unprivileged user (Linux; Vigil itself must run as root).
+ * - Either way they get a minimal environment, never Vigil's (operator key, Switch agent keys).
+ */
+function serviceProcessOptions(extraEnv: Record<string, string>): { env: NodeJS.ProcessEnv; uid?: number; gid?: number } {
+  const env: NodeJS.ProcessEnv = { NODE_NO_WARNINGS: '1', ...extraEnv };
+  for (const key of ['PATH', 'LANG', 'TZ', 'NODE_OPTIONS', 'SystemRoot', 'TEMP', 'TMP']) {
+    if (process.env[key] !== undefined) env[key] = process.env[key];
+  }
+  const user = (process.env.VIGIL_SERVICE_USER ?? '').trim();
+  if (!user) return { env: { ...env, HOME: process.env.HOME } };
+  if (!/^[a-z_][a-z0-9_-]*$/.test(user)) throw new Error(`VIGIL_SERVICE_USER is not a user name: ${user}`);
+  const id = (flag: string) => Number(execFileSync('id', [flag, user], { encoding: 'utf8' }).trim());
+  return { env: { ...env, HOME: `/tmp`, USER: user }, uid: id('-u'), gid: id('-g') };
+}
+
+/** VIGIL_SELF_ALERTS=off: the service does not raise its own alert, so a monitoring tool is the trigger. */
+const SELF_ALERTS = (process.env.VIGIL_SELF_ALERTS ?? 'on').trim().toLowerCase() !== 'off';
 
 export type FaultScenarioId = 'jpy_zero_decimal_500' | 'promo_negative_ledger_500' | 'inventory_lock_leak_503';
 
@@ -314,13 +336,11 @@ export class LiveCheckoutTarget {
     this.processGeneration += 1;
     this.child = spawn(process.execPath, ['--import', 'tsx', 'src/server.ts'], {
       cwd: this.workDir,
-      env: {
-        ...process.env,
+      ...serviceProcessOptions({
         PORT: String(port),
         CHECKOUT_API_PORT: String(port),
-        VIGIL_ALERT_WEBHOOK: this.alertUrl,
-        NODE_NO_WARNINGS: '1',
-      },
+        VIGIL_ALERT_WEBHOOK: SELF_ALERTS ? this.alertUrl : '',
+      }),
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     this.child.stdout?.on('data', () => undefined);
@@ -486,7 +506,7 @@ export class LiveCheckoutTarget {
    * offending author and message, restart the service from that commit, then replay the production
    * payload against the new process. The service itself raises the alert webhook on its first 5xx.
    */
-  public async injectFaultRelease(scenarioId: FaultScenarioId): Promise<IncidentAlertWebhook> {
+  public async injectFaultRelease(scenarioId: FaultScenarioId): Promise<IncidentAlertWebhook | null> {
     const spec = FAULT_CATALOG[scenarioId];
     const patchPath = path.join(this.sourceDir, 'releases', spec.patchFile);
     if (!existsSync(patchPath)) throw new Error(`Missing release patch ${patchPath}`);
@@ -513,13 +533,31 @@ export class LiveCheckoutTarget {
       }).catch(() => undefined);
     }
 
-    const alert = await Promise.race([alertPromise, sleep(8000).then(() => null)]);
-    if (!alert) throw new Error('checkout-api did not raise an alert webhook after the regression deploy');
+    // With self-alerts off, a monitoring tool raises the alert; the release itself is done.
+    const alert = SELF_ALERTS ? await Promise.race([alertPromise, sleep(8000).then(() => null)]) : null;
+    if (SELF_ALERTS && !alert) throw new Error('checkout-api did not raise an alert webhook after the regression deploy');
     await this.pollMetrics(); // the repro errors are in the window now
     return alert;
   }
 
   /** Receives the service's real alert webhook, enriches it with git context, and notifies Vigil. */
+  /**
+   * An alert from a monitoring tool. It opens an incident only when a release Vigil can trace (and
+   * revert or patch) is live; otherwise it is acknowledged with the reason.
+   */
+  public async acceptExternalAlert(
+    raw: RawServiceAlert,
+  ): Promise<{ alert: IncidentAlertWebhook | null; reason?: string }> {
+    if (!this.deployedRegression) {
+      return {
+        alert: null,
+        reason: `No traceable release is live (${this.cachedMetrics.deployedVersion} is a known-good or verified build), so there is nothing to revert or patch.`,
+      };
+    }
+    const alert = await this.handleAlertWebhook(raw);
+    return alert ? { alert } : { alert: null, reason: `An incident is already open for ${raw.deployedVersion}.` };
+  }
+
   public async handleAlertWebhook(raw: RawServiceAlert): Promise<IncidentAlertWebhook | null> {
     const version = raw.deployedVersion;
     if (this.alertedVersions.has(version)) return null;
@@ -596,7 +634,7 @@ export class LiveCheckoutTarget {
     const { stdout, stderr, code } = await new Promise<{ stdout: string; stderr: string; code: number }>((resolve) => {
       const p = spawn(process.execPath, ['--import', 'tsx', '--test', '--test-reporter=tap', 'test/cartPricing.test.ts'], {
         cwd: this.workDir,
-        env: { ...process.env, NODE_NO_WARNINGS: '1' },
+        ...serviceProcessOptions({}),
       });
       let out = '';
       let err = '';
@@ -635,7 +673,7 @@ export class LiveCheckoutTarget {
     const port = 20000 + Math.floor(Math.random() * 20000);
     const child = spawn(process.execPath, ['--import', 'tsx', 'src/server.ts'], {
       cwd: this.workDir,
-      env: { ...process.env, PORT: String(port), VIGIL_ALERT_WEBHOOK: '', NODE_NO_WARNINGS: '1' },
+      ...serviceProcessOptions({ PORT: String(port), VIGIL_ALERT_WEBHOOK: '' }),
       stdio: 'ignore',
     });
     try {
