@@ -11,6 +11,7 @@
 - **Live app:** https://vigil.netlayerlabs.com (War Room at `/app`), running against a real Switch server (switch-core 0.31.0)
 - **Switch server:** https://vigil-switch.netlayerlabs.com · **Mattermost:** https://vigil-chat.netlayerlabs.com
 - **Code:** https://github.com/NetLayerLabs/Vigil
+- **Blog post (Best Blog entry):** https://medium.com/@mrnetwork/turning-a-solo-coding-agent-into-an-incident-response-teammate-with-switch-f4bcc266533f
 
 ## Tagline (One Line)
 Turn SEV-1 production outages into an auditable, multi-room team workflow in the team's chat app (Mattermost on the live deployment) — combining Switch WebSocket protocol agents, CLI coding agents, exclusive role leases, room documents, and a deterministic human release gate.
