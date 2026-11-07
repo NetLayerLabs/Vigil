@@ -36,7 +36,7 @@ Turn SEV-1 production outages into an auditable, multi-room team workflow in the
 - **2:05 – 2:45 | Human chat sign-off, canaries and postmortem:**  
   As a person in chat (priya in Mattermost on the live site, or the Priya test identity locally), send `@vigil-release-gate approve INC-2041 promote`. Watch `checkout-api` promote `v2.14.1-hotfix`, pass its live HTTP canary probes (5 of 5 for the demo service), publish `postmortem-inc-2041` in Room Docs, and close out `#vigil-incidents` releasing `incident-commander`.
 - **2:45 – 3:00 | Live WebSocket Protocol Proof & Clone Reproducibility:**  
-  Flash the **WS Protocol** tab (`connection_state`, `ping`/`pong` cursors, `POST /ops/...`) and `npm test` passing (22 tests in about 20 seconds).
+  Flash the **WS Protocol** tab (`connection_state`, `ping`/`pong` cursors, `POST /ops/...`) and `npm test` passing (26 tests in about 25 seconds).
 
 ---
 

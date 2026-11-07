@@ -295,6 +295,7 @@ On Nov 7, 2026 a second person joined. Nzubechukwu, a teammate with their own Ma
 ## Safety
 
 - **Agents cannot approve.** The gate fails closed: a sender counts as a person only when the server marks it `user`, or when its participant id belongs to a person (a chat-bridge user, or a test identity in Mode A). Agents, Switch itself, unknown ids, and anyone whose handle or display name matches an agent's are refused with `REJECTED_AGENT_SENDER`. Approvers named in the policy are matched on their chat handle, not a display name they could change (`src/gate/releaseSafetyGate.ts`, `tests/releaseSafety.test.ts`).
+- **The approver sees evidence, not a summary.** The request in `#vigil-releases` shows the failure as Vigil's patcher reproduced it on the live service and the same production request replayed on the candidate on staging (for INC-2046: `HTTP 500 TypeError …` before, `HTTP 200, charge 10368` after). It @-mentions the approvers named in the policy, so `set approvers` with the on-call people pages exactly them; when anyone may approve it pings the release owner. Only plain chat usernames are ever mentioned, never `@all`, `@channel`, `@here` or `@everyone` in any disguise, and never an agent. It asks once per verified candidate, only for an open incident, so quoting the hand-off cannot page people again or reopen a closed incident. Text from the service and author names are quoted or cleaned, so they cannot format the message or page anyone.
 - **Policy is data, edited by humans only.** `max_changed_lines` (default 40), `forbidden_paths` (default `.env, secret, auth-keys, migrations/drop`), `require_green_matrix` (default on), `allowed_approvers` (default `any-human`) and `min_canary_probes` (default 5) are parsed from the document's *Settings* block. Policy commands from agents are refused and logged.
 - **Nothing ships unverified.** `promote` needs a confirmed reproduction, a candidate commit that is still staged (a failed candidate is discarded, so switching the green-matrix rule off cannot ship it), a green matrix when the policy requires one, and a diff inside the policy. The candidate is the exact commit that was tested; promote restarts the service from that commit and tags it `v2.14.1-hotfix`.
 - **Rollback is always available.** A person can `approve INC-xxxx rollback` at any time; it resets to the last good release tag (`v2.13.2` for the demo) and restarts.
@@ -336,7 +337,7 @@ This is the offline preview: an embedded server that speaks the Switch protocol 
 git clone https://github.com/NetLayerLabs/Vigil.git
 cd Vigil
 npm install
-npm test           # 22 tests, about 20 seconds
+npm test           # 26 tests, about 25 seconds
 npm run build      # server to dist/server, UI to dist/ui
 npm start          # http://localhost:4010 and checkout-api on :4020
 ```
@@ -365,7 +366,7 @@ For development, `npm run dev` runs the server from source with `tsx`, and `npm 
 The full list with comments is in [`.env.example`](.env.example). Two scripts help outside the UI: `npm run inject:fault jpy_zero_decimal_500` ships a bad release from a terminal, and `npm run onboard:switch` registers the agents in Mode B.
 
 **Test status (Nov 6, 2026):**
-- **Vigil:** `Tests  22 passed (22)` in about 20 s, across 6 files. They cover the template schema; the WebSocket handshake, `ping`/`pong`, `409` lease contention, `403` document authorship and `taken_over` fencing; disguised agent senders; external-coder routing with a rejected non-fix and room-document policy; commander failover; a full incident through promotion; an emergency rollback; monitoring-tool alerts and their authentication; incidents surviving a restart; a target cloned from its own git repository; the gate's fail-closed sender rules, handle-based approvers and discarded candidates; an incident staying open when canaries fall short of the policy; approvals counted only in the releases room; Vigil's patcher taking over when the coding agent stays silent, and leaving it alone when it has answered; and Vigil stopping its service on `SIGTERM`.
+- **Vigil:** `Tests  26 passed (26)` in about 25 s, across 6 files. They cover the template schema; the WebSocket handshake, `ping`/`pong`, `409` lease contention, `403` document authorship and `taken_over` fencing; disguised agent senders; external-coder routing with a rejected non-fix and room-document policy; commander failover; a full incident through promotion; an emergency rollback; monitoring-tool alerts and their authentication; incidents surviving a restart; a target cloned from its own git repository; the gate's fail-closed sender rules, handle-based approvers and discarded candidates; an incident staying open when canaries fall short of the policy; approvals counted only in the releases room; the approval request pinging the policy's approvers and showing the reproduced before and after, with hostile response text neutralised; Vigil's patcher taking over when the coding agent stays silent, and leaving it alone when it has answered; and Vigil stopping its service on `SIGTERM`.
 - **checkout-api on `v2.13.2`:** `pass 5, fail 0` with `node --import tsx --test test/cartPricing.test.ts`.
 - **Each regression fails only its own tests:** the JPY patch fails the JPY and KRW tests (3 pass, 2 fail), the promo patch fails the promo test (4 pass, 1 fail), and the inventory patch fails the fraud-decline lock test (4 pass, 1 fail).
 
@@ -397,7 +398,7 @@ services/checkout-api/src/           the real service: cartPricing.ts (pricing, 
 services/checkout-api/test/          the service's node:test suite (5 tests)
 services/checkout-api/releases/      the three seeded regression patches
 templates/                           Switch group template (3 rooms) and the per-incident workroom template
-tests/                               Vitest suite (22 tests in 6 files)
+tests/                               Vitest suite (26 tests in 6 files)
 scripts/                             onboard-switch-agents.ts, inject-fault.ts, install-switch-console.sh, setup-coder-user.sh
 public/brand/                        the logo lockup and the favicon set
 ui/                                  React UI: Landing.tsx (/), App.tsx (/app), theme.css, landing.css, warroom.css, VigilMark.tsx

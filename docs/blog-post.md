@@ -121,7 +121,7 @@ if ('type' in parsed && parsed.type === 'ping') {
 git clone https://github.com/NetLayerLabs/Vigil.git
 cd Vigil
 npm install
-npm test          # 22 tests
+npm test          # 26 tests
 npm run build
 npm start         # http://localhost:4010
 ```
