@@ -12,6 +12,7 @@ A film of under 3 minutes for the Flip the Switch Hackathon judges (Track 01). I
   - `switch`: the Switch Gateway dashboard (rooms, graph view, the `vigil-hotfix` room and its roles), read only, at 3200x1800.
   - The pointer is drawn by the recorder because headless Chrome has none.
 - **Writes made for the film.** One chaos release (`01 JPY Zero-Decimal 500`), Claude Code's own session, one **Test Rogue Agent Block** click (an agent approval the gate refused), and the approval, which the owner typed in Mattermost as `priya`. The recorder never approves anything. `ONLY=run` refuses to start unless `RUN=yes` is set, no incident is open and the patch mode is `external`.
+- **The teammate scene.** `INC-2047` ran on Nov 7, 2026 with a second person in the rooms: Nzubechukwu (Mattermost `dora`), who typed the question to Claude Code and the approval themselves. Its record is `data/run2_run.json` and its chat `data/chat-inc2047.json`; the clips `run2_*` were recorded the same way, at 3200x1800, with no rogue-agent click.
 - **Motion graphics.** The problem cards, the rooms rail and the claims are drawn from the real data above; no UI is mocked. The Mattermost clock shows the recording machine's time zone (UTC+1); the times quoted here are UTC.
 - **Voice, music and sound.** ElevenLabs: narration by the voice Matilda (`eleven_multilingual_v2`), music from `/v1/music`, effects from `/v1/sound-generation`.
 

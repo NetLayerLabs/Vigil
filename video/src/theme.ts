@@ -39,5 +39,5 @@ export const TONE: Record<Tone, { bg: string; ink: string; muted: string; line: 
 
 export const SCENE_TONE: Record<string, Tone> = {
   open: "dark", problem: "light", gap: "dark", turn: "light", break: "dark", chat: "dark",
-  verify: "light", rogue: "dark", ship: "light", switch: "light", unique: "brand", close: "light",
+  verify: "light", rogue: "dark", ship: "light", team: "light", switch: "light", unique: "brand", close: "light",
 };

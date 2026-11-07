@@ -193,6 +193,9 @@ if (want("check")) {
 }
 
 if (want("run")) {
+  // TAG=run2_ records a second run into separate clips; NO_ROGUE=1 skips the rogue-agent click.
+  const TAG = process.env.TAG || "";
+  const NO_ROGUE = process.env.NO_ROGUE === "1";
   if (process.env.RUN !== "yes") { console.error("The run makes live writes. Set RUN=yes once the owner has agreed."); process.exit(1); }
   const before = await state();
   if (before.activeIncident) { console.error(`An incident is already open (${before.activeIncident.incidentId}). Not starting.`); process.exit(1); }
@@ -204,18 +207,18 @@ if (want("run")) {
   await Promise.all([mattermost(hot, "vigil-hotfix"), mattermost(rel, "vigil-releases")]);
   await war.b.goto(`${VIGIL}/app`, 6000);
   await war.overlay();
-  setMeta("warroom", { url: "vigil.netlayerlabs.com/app" });
-  setMeta("mm_hotfix", { url: "vigil-chat.netlayerlabs.com · #vigil-hotfix" });
-  setMeta("mm_releases", { url: "vigil-chat.netlayerlabs.com · #vigil-releases" });
+  setMeta(`${TAG}warroom`, { url: "vigil.netlayerlabs.com/app" });
+  setMeta(`${TAG}mm_hotfix`, { url: "vigil-chat.netlayerlabs.com · #vigil-hotfix" });
+  setMeta(`${TAG}mm_releases`, { url: "vigil-chat.netlayerlabs.com · #vigil-releases" });
 
-  await Promise.all([war.rec("warroom"), hot.rec("mm_hotfix"), rel.rec("mm_releases")]);
+  await Promise.all([war.rec(`${TAG}warroom`), hot.rec(`${TAG}mm_hotfix`), rel.rec(`${TAG}mm_releases`)]);
   await sleep(4000);
 
   // The chaos release.
   const chaos = byText("button", "JPY Zero-Decimal 500");
   await war.waitFor(chaos);
   await war.press(chaos, 400);
-  mark("run.chaos");
+  mark(`${TAG}run.chaos`);
 
   // Follow the incident by its live state; mark every stage change.
   const seen = new Set();
@@ -226,37 +229,42 @@ if (want("run")) {
     const inc = s?.activeIncident ?? (incidentId ? s?.incidents?.find((i) => i.incidentId === incidentId) : null);
     if (inc) {
       incidentId = inc.incidentId;
-      if (!seen.has(inc.stage)) { seen.add(inc.stage); mark(`run.stage.${inc.stage}`); }
-      if (inc.patchVerification && !seen.has("verified")) { seen.add("verified"); mark("run.verified"); }
+      if (!seen.has(inc.stage)) { seen.add(inc.stage); mark(`${TAG}run.stage.${inc.stage}`); }
+      if (inc.patchVerification && !seen.has("verified")) { seen.add("verified"); mark(`${TAG}run.verified`); }
       if (inc.stage === "awaiting_human_gate" && !patchTabOpen) {
         patchTabOpen = true;
         await sleep(2500);
         await war.press(byText("button", "Patch & Canary"), 2500);
-        mark("run.patchtab");
+        mark(`${TAG}run.patchtab`);
         await sleep(9000);
+      }
+      if (inc.stage === "awaiting_human_gate" && patchTabOpen && !rogueDone && NO_ROGUE) {
+        rogueDone = true;
+        mark(`${TAG}run.ready`);
+        log(">>> Ready for the person: @vigil-release-gate approve " + incidentId + " promote");
       }
       if (inc.stage === "awaiting_human_gate" && patchTabOpen && !rogueDone) {
         rogueDone = true;
         await war.press(byText("button", "Test Rogue Agent Block"), 600);
-        mark("run.rogue");
+        mark(`${TAG}run.rogue`);
         log(">>> Now type in Mattermost #vigil-releases:  @vigil-release-gate approve " + incidentId + " promote");
       }
       if (inc.stage?.startsWith("resolved") || inc.stage === "interrupted") {
-        mark("run.closed");
+        mark(`${TAG}run.closed`);
         await sleep(15000);
         break;
       }
     }
     await sleep(1000);
   }
-  await Promise.all([war.endRec("warroom"), hot.endRec("mm_hotfix"), rel.endRec("mm_releases")]);
-  for (const c of [war, hot, rel]) await c.shot(join(STILLS, `${c.name}-end.png`)).catch(() => {});
+  await Promise.all([war.endRec(`${TAG}warroom`), hot.endRec(`${TAG}mm_hotfix`), rel.endRec(`${TAG}mm_releases`)]);
+  for (const c of [war, hot, rel]) await c.shot(join(STILLS, `${TAG}${c.name}-end.png`)).catch(() => {});
   [war, hot, rel].forEach((c) => c.b.close());
 
   // The incident's real record, for every figure the film quotes.
   const after = await state();
   const inc = after.incidents.find((i) => i.incidentId === incidentId);
-  writeFileSync(join(ROOT, "data/run.json"), JSON.stringify({ checkedAt: new Date().toISOString(), source: `${VIGIL}/api/state`, incident: inc }, null, 1));
+  writeFileSync(join(ROOT, `data/${TAG}run.json`), JSON.stringify({ checkedAt: new Date().toISOString(), source: `${VIGIL}/api/state`, incident: inc }, null, 1));
   log("saved data/run.json for", incidentId, inc?.stage);
 }
 

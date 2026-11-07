@@ -106,6 +106,17 @@
    ]
   },
   {
+   "id": "team",
+   "seconds": 10,
+   "lines": [
+    {
+     "voice": "narrator",
+     "text": "On the next incident, a teammate shipped it. Nzubechukwu approved in Mattermost. And Claude Code still takes instructions only from its owner.",
+     "say": "On the next incident, a teammate shipped it. Nzoobeh-chookwoo approved in Mattermost. And Claude Code still takes instructions only from its owner."
+    }
+   ]
+  },
+  {
    "id": "switch",
    "seconds": 21,
    "lines": [

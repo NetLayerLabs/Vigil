@@ -6,11 +6,11 @@ import { Captions } from "./ui/Captions";
 import { Grain } from "./ui/Grain";
 import { clamp } from "./ui/motion";
 import { effects } from "./sfx";
-import { Break, Chat, Close, Gap, Open, Problem, Rogue, Ship, SwitchScene, Turn, Unique, Verify } from "./scenes/Scenes";
+import { Break, Chat, Close, Gap, Open, Problem, Rogue, Ship, SwitchScene, Team, Turn, Unique, Verify } from "./scenes/Scenes";
 
 const SCENES: Record<string, React.FC> = {
   open: Open, problem: Problem, gap: Gap, turn: Turn, break: Break, chat: Chat,
-  verify: Verify, rogue: Rogue, ship: Ship, switch: SwitchScene, unique: Unique, close: Close,
+  verify: Verify, rogue: Rogue, ship: Ship, team: Team, switch: SwitchScene, unique: Unique, close: Close,
 };
 const OVERLAP = 12; // frames each scene starts early, to dissolve over the last
 

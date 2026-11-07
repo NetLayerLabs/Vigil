@@ -6,7 +6,7 @@ import { RoomRail } from "../ui/Motif";
 import { Words } from "../ui/Words";
 import { Count } from "../ui/Count";
 import { clamp, soft } from "../ui/motion";
-import { CHECKS, Card, EV, Fill, Head, In, Kicker, Mono, PASSED, RUN, SECONDS, Stamp, useCue } from "./common";
+import { CHECKS, Card, EV, EV2, Fill, Head, In, Kicker, Mono, PASSED, RUN, RUN2, SECONDS, Stamp, useCue } from "./common";
 
 // Layout shared by the footage scenes: the screen nearly full width, the rooms rail above it.
 const MAIN = { width: 1560, left: 180, top: 118 };
@@ -210,6 +210,29 @@ export const Ship: React.FC = () => {
       <Stat at={rel("canary") - 6} top={330} big={<span><Count to={c.probesPassed} at={rel("canary") - 6} dur={18} /> of {c.probesRun}</span>} small="canary probes answered after the deploy" />
       <Stat at={rel("postmortem") - 6} top={510} big={<span style={{ fontFamily: mono, fontSize: 34, letterSpacing: 0 }}>postmortem-inc-2046</span>} small="written to a Switch room document" />
       <Stat at={rel("Seventy-seven") - 6} top={690} big={<span><Count to={SECONDS} at={rel("Seventy-seven") - 6} dur={24} /> seconds</span>} small={`alert to closed · ${RUN.finalVersion} live`} />
+    </Fill>
+  );
+};
+
+/* 9b. Team: on the next incident a second person, Nzubechukwu (dora), approved; Claude Code takes orders only from its owner. */
+export const Team: React.FC = () => {
+  const { rel } = useCue("team");
+  const start = EV2.approve - rel("approved") - 4;
+  const dora = RUN2.gateDecisions.find((g) => g.reasonCode === "APPROVED_PROMOTE");
+  return (
+    <Fill bg={C.paper} color={C.paperInk}>
+      <RoomRail path={[{ f: 0, at: 2 }]} openAt={EV2.shipped - start} label={RUN2.incidentId} />
+      <Browser name="run2_mm_releases" url={MM_URL("vigil-releases")} width={1200} left={60} top={150} startFrom={start} />
+      <Card at={rel("approved") - 2} left={1310} top={150} width={540} style={{ padding: "22px 28px" }}>
+        <Mono size={15} color={C.paperMuted}>{RUN2.incidentId} · A SECOND PERSON</Mono>
+        <div style={{ fontSize: 46, fontWeight: 600, letterSpacing: "-0.035em", marginTop: 8 }}>Nzubechukwu</div>
+        <div style={{ fontSize: 20, color: C.paperMuted, marginTop: 6 }}>approved as <span style={{ fontFamily: mono }}>{dora?.senderName ?? "dora"}</span> in Mattermost · {RUN2.canaryReport.probesPassed} of {RUN2.canaryReport.probesRun} canaries</div>
+      </Card>
+      <Card at={rel("instructions") - 8} left={1310} top={420} width={540} style={{ padding: "22px 28px" }} accent={C.paperInk}>
+        <Mono size={15} color={C.paperMuted}>CLAUDE-CODE IN #VIGIL-HOTFIX</Mono>
+        <div style={{ fontSize: 23, lineHeight: 1.4, marginTop: 10 }}>“@dora I only take instructions from my owner, and this chat account isn't linked to a Switch user yet.”</div>
+        <div style={{ fontSize: 18, color: C.paperMuted, marginTop: 12 }}>Teammates see everything and can approve. Only the owner steers the agent.</div>
+      </Card>
     </Fill>
   );
 };

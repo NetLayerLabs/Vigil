@@ -30,5 +30,23 @@ for (const clip of ["warroom", "mm_hotfix", "mm_releases"]) {
   const s = t0(clip);
   out[clip] = Object.fromEntries(Object.entries(ev).map(([k, t]) => [k, Math.round((t - s) * 30)]));
 }
+// The second run (INC-2047): a teammate, dora, approved it.
+const chat2 = JSON.parse(readFileSync(ROOT + "data/chat-inc2047.json", "utf8"));
+const find2 = (ch, user, re) => {
+  const p = chat2.channels[ch].find((m) => m.user === user && re.test(m.message));
+  if (!p) throw new Error(`no ${user} message matching ${re} in ${ch} (INC-2047)`);
+  return at(p.at);
+};
+const ev2 = {
+  doraAsks: find2("vigil-hotfix", "dora", /what caused this/),
+  ownerOnly: find2("vigil-hotfix", "claude-code", /only take instructions from my owner/),
+  needsHuman: find2("vigil-releases", "vigil-release-gate", /needs a human decision/),
+  approve: find2("vigil-releases", "dora", /approve INC-2047 promote/),
+  shipped: find2("vigil-releases", "vigil-release-gate", /shipped/),
+};
+for (const clip of ["run2_warroom", "run2_mm_hotfix", "run2_mm_releases"]) {
+  const s = t0(clip);
+  out[clip] = Object.fromEntries(Object.entries(ev2).map(([k, t]) => [k, Math.round((t - s) * 30)]));
+}
 writeFileSync(ROOT + "src/events.json", JSON.stringify(out, null, 1));
 console.log(JSON.stringify(out));

@@ -43,5 +43,26 @@
   "shipped": 2493,
   "opened": 184,
   "closed": 2584
+ },
+ "run2_warroom": {
+  "doraAsks": 721,
+  "ownerOnly": 729,
+  "needsHuman": 734,
+  "approve": 2361,
+  "shipped": 2484
+ },
+ "run2_mm_hotfix": {
+  "doraAsks": 721,
+  "ownerOnly": 729,
+  "needsHuman": 734,
+  "approve": 2361,
+  "shipped": 2484
+ },
+ "run2_mm_releases": {
+  "doraAsks": 721,
+  "ownerOnly": 729,
+  "needsHuman": 734,
+  "approve": 2361,
+  "shipped": 2484
  }
 }

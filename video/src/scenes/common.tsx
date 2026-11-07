@@ -5,6 +5,7 @@ import { C, display, mono, sans } from "../theme";
 import { clamp, expo, pop } from "../ui/motion";
 import runJson from "../../data/run.json";
 import eventsJson from "../events.json";
+import run2Json from "../../data/run2_run.json";
 
 /** Scene-local frame and word cues: rel("word", n) is when the nth "word" is spoken, scene-local. */
 export function useCue(id: string) {
@@ -25,12 +26,15 @@ export const RUN = (runJson as unknown as {
     gateDecisions: { reasonCode: string; senderName: string }[];
   };
 }).incident;
+export const RUN2 = (run2Json as unknown as { incident: typeof RUN }).incident;
 export const SECONDS = Math.round((RUN.resolvedAt - RUN.openedAt) / 1000);
 export const CHECKS = RUN.patchVerification.testMatrix;
 export const PASSED = CHECKS.filter((c) => c.passed).length;
 
 /** Clip frame of each real chat message (scripts/events.mjs). The three run clips share one clock. */
 export const EV = (eventsJson as unknown as Record<string, Record<string, number>>).warroom;
+/** The same for the second run, INC-2047, which a teammate (dora) approved. */
+export const EV2 = (eventsJson as unknown as Record<string, Record<string, number>>).run2_mm_releases;
 
 export const Fill: React.FC<{ bg: string; children: React.ReactNode; color?: string }> = ({ bg, children, color = "#fff" }) => (
   <AbsoluteFill style={{ background: bg, fontFamily: sans, color, overflow: "hidden" }}>{children}</AbsoluteFill>

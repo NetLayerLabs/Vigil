@@ -1,289 +1,364 @@
 {
  "fps": 30,
- "totalFrames": 5048,
- "bpm": 100,
+ "totalFrames": 5250,
+ "bpm": 122,
  "beats": [
   1,
-  19,
-  37,
-  55,
-  73,
-  91,
-  109,
-  127,
-  145,
+  16,
+  30,
+  45,
+  60,
+  75,
+  89,
+  104,
+  119,
+  134,
+  148,
   163,
-  181,
-  199,
-  217,
-  235,
-  253,
-  271,
-  289,
-  307,
+  178,
+  193,
+  207,
+  222,
+  237,
+  252,
+  266,
+  281,
+  296,
+  311,
   325,
-  343,
-  361,
-  379,
-  397,
-  415,
-  433,
-  451,
-  469,
-  487,
-  505,
-  523,
-  541,
-  559,
-  577,
-  595,
-  613,
-  631,
-  649,
-  667,
-  685,
-  703,
-  721,
+  340,
+  355,
+  370,
+  385,
+  399,
+  414,
+  429,
+  444,
+  458,
+  473,
+  488,
+  503,
+  517,
+  532,
+  547,
+  562,
+  576,
+  591,
+  606,
+  621,
+  635,
+  650,
+  665,
+  680,
+  694,
+  709,
+  724,
   739,
-  757,
-  775,
-  793,
-  811,
-  829,
-  847,
-  865,
-  883,
+  753,
+  768,
+  783,
+  798,
+  812,
+  827,
+  842,
+  857,
+  871,
+  886,
   901,
-  919,
-  937,
-  955,
-  973,
-  991,
-  1009,
-  1027,
-  1045,
+  916,
+  930,
+  945,
+  960,
+  975,
+  989,
+  1004,
+  1019,
+  1034,
+  1048,
   1063,
-  1081,
-  1099,
-  1117,
-  1135,
-  1153,
-  1171,
-  1189,
-  1207,
+  1078,
+  1093,
+  1107,
+  1122,
+  1137,
+  1152,
+  1166,
+  1181,
+  1196,
+  1211,
   1225,
-  1243,
-  1261,
-  1279,
-  1297,
-  1315,
-  1333,
-  1351,
-  1369,
-  1387,
-  1405,
-  1423,
-  1441,
-  1459,
-  1477,
-  1495,
-  1513,
-  1531,
-  1549,
-  1567,
-  1585,
-  1603,
-  1621,
+  1240,
+  1255,
+  1270,
+  1285,
+  1299,
+  1314,
+  1329,
+  1344,
+  1358,
+  1373,
+  1388,
+  1403,
+  1417,
+  1432,
+  1447,
+  1462,
+  1476,
+  1491,
+  1506,
+  1521,
+  1535,
+  1550,
+  1565,
+  1580,
+  1594,
+  1609,
+  1624,
   1639,
-  1657,
-  1675,
-  1693,
-  1711,
-  1729,
-  1747,
-  1765,
-  1783,
+  1653,
+  1668,
+  1683,
+  1698,
+  1712,
+  1727,
+  1742,
+  1757,
+  1771,
+  1786,
   1801,
-  1819,
-  1837,
-  1855,
-  1873,
-  1891,
-  1909,
-  1927,
-  1945,
+  1816,
+  1830,
+  1845,
+  1860,
+  1875,
+  1889,
+  1904,
+  1919,
+  1934,
+  1948,
   1963,
-  1981,
-  1999,
-  2017,
-  2035,
-  2053,
-  2071,
-  2089,
-  2107,
+  1978,
+  1993,
+  2007,
+  2022,
+  2037,
+  2052,
+  2066,
+  2081,
+  2096,
+  2111,
   2125,
-  2143,
-  2161,
-  2179,
-  2197,
-  2215,
-  2233,
-  2251,
-  2269,
-  2287,
-  2305,
-  2323,
-  2341,
-  2359,
-  2377,
-  2395,
-  2413,
-  2431,
-  2449,
-  2467,
-  2485,
-  2503,
-  2521,
+  2140,
+  2155,
+  2170,
+  2185,
+  2199,
+  2214,
+  2229,
+  2244,
+  2258,
+  2273,
+  2288,
+  2303,
+  2317,
+  2332,
+  2347,
+  2362,
+  2376,
+  2391,
+  2406,
+  2421,
+  2435,
+  2450,
+  2465,
+  2480,
+  2494,
+  2509,
+  2524,
   2539,
-  2557,
-  2575,
-  2593,
-  2611,
-  2629,
-  2647,
-  2665,
-  2683,
+  2553,
+  2568,
+  2583,
+  2598,
+  2612,
+  2627,
+  2642,
+  2657,
+  2671,
+  2686,
   2701,
-  2719,
-  2737,
-  2755,
-  2773,
-  2791,
-  2809,
-  2827,
-  2845,
+  2716,
+  2730,
+  2745,
+  2760,
+  2775,
+  2789,
+  2804,
+  2819,
+  2834,
+  2848,
   2863,
-  2881,
-  2899,
-  2917,
-  2935,
-  2953,
-  2971,
-  2989,
-  3007,
+  2878,
+  2893,
+  2907,
+  2922,
+  2937,
+  2952,
+  2966,
+  2981,
+  2996,
+  3011,
   3025,
-  3043,
-  3061,
-  3079,
-  3097,
-  3115,
-  3133,
-  3151,
-  3169,
-  3187,
-  3205,
-  3223,
-  3241,
-  3259,
-  3277,
-  3295,
-  3313,
-  3331,
-  3349,
-  3367,
-  3385,
-  3403,
-  3421,
+  3040,
+  3055,
+  3070,
+  3085,
+  3099,
+  3114,
+  3129,
+  3144,
+  3158,
+  3173,
+  3188,
+  3203,
+  3217,
+  3232,
+  3247,
+  3262,
+  3276,
+  3291,
+  3306,
+  3321,
+  3335,
+  3350,
+  3365,
+  3380,
+  3394,
+  3409,
+  3424,
   3439,
-  3457,
-  3475,
-  3493,
-  3511,
-  3529,
-  3547,
-  3565,
-  3583,
+  3453,
+  3468,
+  3483,
+  3498,
+  3512,
+  3527,
+  3542,
+  3557,
+  3571,
+  3586,
   3601,
-  3619,
-  3637,
-  3655,
-  3673,
-  3691,
-  3709,
-  3727,
-  3745,
+  3616,
+  3630,
+  3645,
+  3660,
+  3675,
+  3689,
+  3704,
+  3719,
+  3734,
+  3748,
   3763,
-  3781,
-  3799,
-  3817,
-  3835,
-  3853,
-  3871,
-  3889,
-  3907,
+  3778,
+  3793,
+  3807,
+  3822,
+  3837,
+  3852,
+  3866,
+  3881,
+  3896,
+  3911,
   3925,
-  3943,
-  3961,
-  3979,
-  3997,
-  4015,
-  4033,
-  4051,
-  4069,
-  4087,
-  4105,
-  4123,
-  4141,
-  4159,
-  4177,
-  4195,
-  4213,
-  4231,
-  4249,
-  4267,
-  4285,
-  4303,
-  4321,
+  3940,
+  3955,
+  3970,
+  3985,
+  3999,
+  4014,
+  4029,
+  4044,
+  4058,
+  4073,
+  4088,
+  4103,
+  4117,
+  4132,
+  4147,
+  4162,
+  4176,
+  4191,
+  4206,
+  4221,
+  4235,
+  4250,
+  4265,
+  4280,
+  4294,
+  4309,
+  4324,
   4339,
-  4357,
-  4375,
-  4393,
-  4411,
-  4429,
-  4447,
-  4465,
-  4483,
+  4353,
+  4368,
+  4383,
+  4398,
+  4412,
+  4427,
+  4442,
+  4457,
+  4471,
+  4486,
   4501,
-  4519,
-  4537,
-  4555,
-  4573,
-  4591,
-  4609,
-  4627,
-  4645,
+  4516,
+  4530,
+  4545,
+  4560,
+  4575,
+  4589,
+  4604,
+  4619,
+  4634,
+  4648,
   4663,
-  4681,
-  4699,
-  4717,
-  4735,
-  4753,
-  4771,
-  4789,
-  4807,
+  4678,
+  4693,
+  4707,
+  4722,
+  4737,
+  4752,
+  4766,
+  4781,
+  4796,
+  4811,
   4825,
-  4843,
-  4861,
-  4879,
-  4897,
-  4915,
-  4933,
-  4951,
-  4969,
-  4987,
-  5005,
-  5023,
-  5041
+  4840,
+  4855,
+  4870,
+  4885,
+  4899,
+  4914,
+  4929,
+  4944,
+  4958,
+  4973,
+  4988,
+  5003,
+  5017,
+  5032,
+  5047,
+  5062,
+  5076,
+  5091,
+  5106,
+  5121,
+  5135,
+  5150,
+  5165,
+  5180,
+  5194,
+  5209,
+  5224,
+  5239
  ],
  "music": {
   "file": "audio/music.mp3",
@@ -293,120 +368,120 @@
   {
    "id": "open",
    "from": 0,
-   "durationInFrames": 271,
+   "durationInFrames": 270,
    "lines": [
     {
      "voice": "narrator",
      "text": "One line in a team chat. Approve, promote. Typed by a person, it is the only way this fix reaches production.",
      "file": "audio/vo/open_0.mp3",
-     "startFrame": 12,
+     "startFrame": 8,
      "durationFrames": 236,
      "estimated": false,
      "words": [
       {
        "word": "One",
-       "start": 12,
-       "end": 18
+       "start": 8,
+       "end": 14
       },
       {
        "word": "line",
-       "start": 19,
-       "end": 27
+       "start": 15,
+       "end": 23
       },
       {
        "word": "in",
-       "start": 28,
-       "end": 29
+       "start": 24,
+       "end": 25
       },
       {
        "word": "a",
-       "start": 31,
-       "end": 32
+       "start": 27,
+       "end": 28
       },
       {
        "word": "team",
-       "start": 33,
-       "end": 39
+       "start": 29,
+       "end": 35
       },
       {
        "word": "chat.",
-       "start": 41,
-       "end": 56
+       "start": 37,
+       "end": 52
       },
       {
        "word": "Approve,",
-       "start": 69,
-       "end": 90
+       "start": 65,
+       "end": 86
       },
       {
        "word": "promote.",
-       "start": 94,
-       "end": 112
+       "start": 90,
+       "end": 108
       },
       {
        "word": "Typed",
-       "start": 126,
-       "end": 138
+       "start": 122,
+       "end": 134
       },
       {
        "word": "by",
-       "start": 139,
-       "end": 143
+       "start": 135,
+       "end": 139
       },
       {
        "word": "a",
-       "start": 145,
-       "end": 145
+       "start": 141,
+       "end": 141
       },
       {
        "word": "person,",
-       "start": 147,
-       "end": 164
+       "start": 143,
+       "end": 160
       },
       {
        "word": "it",
+       "start": 164,
+       "end": 167
+      },
+      {
+       "word": "is",
        "start": 168,
        "end": 171
       },
       {
-       "word": "is",
-       "start": 172,
-       "end": 175
-      },
-      {
        "word": "the",
-       "start": 176,
-       "end": 178
+       "start": 172,
+       "end": 174
       },
       {
        "word": "only",
-       "start": 181,
-       "end": 187
+       "start": 177,
+       "end": 183
       },
       {
        "word": "way",
-       "start": 189,
-       "end": 194
+       "start": 185,
+       "end": 190
       },
       {
        "word": "this",
-       "start": 196,
-       "end": 200
+       "start": 192,
+       "end": 196
       },
       {
        "word": "fix",
-       "start": 203,
-       "end": 209
+       "start": 199,
+       "end": 205
       },
       {
        "word": "reaches",
-       "start": 212,
-       "end": 220
+       "start": 208,
+       "end": 216
       },
       {
        "word": "production.",
-       "start": 221,
-       "end": 247
+       "start": 217,
+       "end": 243
       }
      ]
     }
@@ -414,236 +489,236 @@
   },
   {
    "id": "problem",
-   "from": 271,
+   "from": 270,
    "durationInFrames": 510,
    "lines": [
     {
      "voice": "narrator",
      "text": "Teams already let coding agents fix bugs. But in an outage, the agent sits in one engineer's terminal. Nobody else sees what it found. Two people can stage two different fixes. And an agent that holds the deploy keys can ship its own change.",
      "file": "audio/vo/problem_0.mp3",
-     "startFrame": 283,
+     "startFrame": 278,
      "durationFrames": 481,
      "estimated": false,
      "words": [
       {
        "word": "Teams",
-       "start": 283,
-       "end": 295
+       "start": 278,
+       "end": 290
       },
       {
        "word": "already",
-       "start": 297,
-       "end": 307
+       "start": 292,
+       "end": 302
       },
       {
        "word": "let",
-       "start": 308,
-       "end": 313
+       "start": 303,
+       "end": 308
       },
       {
        "word": "coding",
-       "start": 314,
-       "end": 323
+       "start": 309,
+       "end": 318
       },
       {
        "word": "agents",
-       "start": 325,
-       "end": 334
+       "start": 320,
+       "end": 329
       },
       {
        "word": "fix",
-       "start": 336,
-       "end": 342
+       "start": 331,
+       "end": 337
       },
       {
        "word": "bugs.",
-       "start": 345,
-       "end": 361
+       "start": 340,
+       "end": 356
       },
       {
        "word": "But",
-       "start": 375,
+       "start": 370,
+       "end": 374
+      },
+      {
+       "word": "in",
+       "start": 376,
        "end": 379
       },
       {
-       "word": "in",
-       "start": 381,
-       "end": 384
-      },
-      {
        "word": "an",
-       "start": 385,
-       "end": 387
+       "start": 380,
+       "end": 382
       },
       {
        "word": "outage,",
-       "start": 389,
-       "end": 404
+       "start": 384,
+       "end": 399
       },
       {
        "word": "the",
-       "start": 408,
-       "end": 411
+       "start": 403,
+       "end": 406
       },
       {
        "word": "agent",
-       "start": 413,
-       "end": 422
+       "start": 408,
+       "end": 417
       },
       {
        "word": "sits",
-       "start": 423,
-       "end": 430
+       "start": 418,
+       "end": 425
       },
       {
        "word": "in",
-       "start": 431,
-       "end": 433
+       "start": 426,
+       "end": 428
       },
       {
        "word": "one",
-       "start": 436,
-       "end": 441
+       "start": 431,
+       "end": 436
       },
       {
        "word": "engineer's",
-       "start": 443,
-       "end": 456
+       "start": 438,
+       "end": 451
       },
       {
        "word": "terminal.",
-       "start": 458,
-       "end": 477
+       "start": 453,
+       "end": 472
       },
       {
        "word": "Nobody",
-       "start": 495,
-       "end": 507
+       "start": 490,
+       "end": 502
       },
       {
        "word": "else",
-       "start": 509,
-       "end": 516
+       "start": 504,
+       "end": 511
       },
       {
        "word": "sees",
-       "start": 517,
-       "end": 523
+       "start": 512,
+       "end": 518
       },
       {
        "word": "what",
-       "start": 524,
-       "end": 528
+       "start": 519,
+       "end": 523
       },
       {
        "word": "it",
-       "start": 529,
-       "end": 530
+       "start": 524,
+       "end": 525
       },
       {
        "word": "found.",
-       "start": 532,
-       "end": 548
+       "start": 527,
+       "end": 543
       },
       {
        "word": "Two",
-       "start": 566,
-       "end": 572
+       "start": 561,
+       "end": 567
       },
       {
        "word": "people",
-       "start": 574,
-       "end": 583
+       "start": 569,
+       "end": 578
       },
       {
        "word": "can",
-       "start": 584,
-       "end": 587
+       "start": 579,
+       "end": 582
       },
       {
        "word": "stage",
-       "start": 589,
-       "end": 599
+       "start": 584,
+       "end": 594
       },
       {
        "word": "two",
-       "start": 601,
-       "end": 606
+       "start": 596,
+       "end": 601
       },
       {
        "word": "different",
-       "start": 608,
-       "end": 616
+       "start": 603,
+       "end": 611
       },
       {
        "word": "fixes.",
-       "start": 617,
-       "end": 637
+       "start": 612,
+       "end": 632
       },
       {
        "word": "And",
-       "start": 650,
-       "end": 655
+       "start": 645,
+       "end": 650
       },
       {
        "word": "an",
-       "start": 656,
-       "end": 658
+       "start": 651,
+       "end": 653
       },
       {
        "word": "agent",
-       "start": 660,
-       "end": 669
+       "start": 655,
+       "end": 664
       },
       {
        "word": "that",
-       "start": 670,
-       "end": 674
+       "start": 665,
+       "end": 669
       },
       {
        "word": "holds",
-       "start": 676,
-       "end": 683
+       "start": 671,
+       "end": 678
       },
       {
        "word": "the",
-       "start": 684,
-       "end": 686
+       "start": 679,
+       "end": 681
       },
       {
        "word": "deploy",
-       "start": 687,
-       "end": 696
+       "start": 682,
+       "end": 691
       },
       {
        "word": "keys",
-       "start": 697,
-       "end": 707
+       "start": 692,
+       "end": 702
       },
       {
        "word": "can",
-       "start": 711,
-       "end": 716
+       "start": 706,
+       "end": 711
       },
       {
        "word": "ship",
-       "start": 717,
-       "end": 724
+       "start": 712,
+       "end": 719
       },
       {
        "word": "its",
-       "start": 727,
-       "end": 731
+       "start": 722,
+       "end": 726
       },
       {
        "word": "own",
-       "start": 733,
-       "end": 738
+       "start": 728,
+       "end": 733
       },
       {
        "word": "change.",
-       "start": 740,
-       "end": 764
+       "start": 735,
+       "end": 759
       }
      ]
     }
@@ -651,76 +726,76 @@
   },
   {
    "id": "gap",
-   "from": 781,
+   "from": 780,
    "durationInFrames": 180,
    "lines": [
     {
      "voice": "narrator",
      "text": "What's missing is not a smarter model. It's a room with rules.",
      "file": "audio/vo/gap_0.mp3",
-     "startFrame": 793,
+     "startFrame": 788,
      "durationFrames": 108,
      "estimated": false,
      "words": [
       {
        "word": "What's",
-       "start": 793,
-       "end": 801
+       "start": 788,
+       "end": 796
       },
       {
        "word": "missing",
-       "start": 802,
-       "end": 813
+       "start": 797,
+       "end": 808
       },
       {
        "word": "is",
-       "start": 815,
-       "end": 820
+       "start": 810,
+       "end": 815
       },
       {
        "word": "not",
-       "start": 822,
-       "end": 826
+       "start": 817,
+       "end": 821
       },
       {
        "word": "a",
-       "start": 827,
-       "end": 828
+       "start": 822,
+       "end": 823
       },
       {
        "word": "smarter",
-       "start": 829,
-       "end": 839
+       "start": 824,
+       "end": 834
       },
       {
        "word": "model.",
-       "start": 840,
-       "end": 853
+       "start": 835,
+       "end": 848
       },
       {
        "word": "It's",
-       "start": 859,
-       "end": 864
+       "start": 854,
+       "end": 859
       },
       {
        "word": "a",
-       "start": 865,
-       "end": 866
+       "start": 860,
+       "end": 861
       },
       {
        "word": "room",
-       "start": 868,
-       "end": 873
+       "start": 863,
+       "end": 868
       },
       {
        "word": "with",
-       "start": 874,
-       "end": 878
+       "start": 869,
+       "end": 873
       },
       {
        "word": "rules.",
-       "start": 879,
-       "end": 900
+       "start": 874,
+       "end": 895
       }
      ]
     }
@@ -728,86 +803,86 @@
   },
   {
    "id": "turn",
-   "from": 961,
+   "from": 960,
    "durationInFrames": 240,
    "lines": [
     {
      "voice": "narrator",
      "text": "Meet Vigil. Claude Code fixes the outage. A person ships it. Built on Switch.",
      "file": "audio/vo/turn_0.mp3",
-     "startFrame": 973,
+     "startFrame": 968,
      "durationFrames": 162,
      "estimated": false,
      "words": [
       {
        "word": "Meet",
-       "start": 973,
-       "end": 981
+       "start": 968,
+       "end": 976
       },
       {
        "word": "Vigil.",
-       "start": 983,
-       "end": 999
+       "start": 978,
+       "end": 994
       },
       {
        "word": "Claude",
-       "start": 1004,
-       "end": 1014
+       "start": 999,
+       "end": 1009
       },
       {
        "word": "Code",
-       "start": 1015,
-       "end": 1023
+       "start": 1010,
+       "end": 1018
       },
       {
        "word": "fixes",
-       "start": 1025,
-       "end": 1035
+       "start": 1020,
+       "end": 1030
       },
       {
        "word": "the",
-       "start": 1036,
-       "end": 1038
+       "start": 1031,
+       "end": 1033
       },
       {
        "word": "outage.",
-       "start": 1040,
-       "end": 1055
+       "start": 1035,
+       "end": 1050
       },
       {
        "word": "A",
-       "start": 1063,
-       "end": 1065
+       "start": 1058,
+       "end": 1060
       },
       {
        "word": "person",
-       "start": 1068,
-       "end": 1077
+       "start": 1063,
+       "end": 1072
       },
       {
        "word": "ships",
-       "start": 1079,
-       "end": 1087
+       "start": 1074,
+       "end": 1082
       },
       {
        "word": "it.",
-       "start": 1089,
-       "end": 1095
+       "start": 1084,
+       "end": 1090
       },
       {
        "word": "Built",
-       "start": 1100,
-       "end": 1107
+       "start": 1095,
+       "end": 1102
       },
       {
        "word": "on",
-       "start": 1109,
-       "end": 1111
+       "start": 1104,
+       "end": 1106
       },
       {
        "word": "Switch.",
-       "start": 1113,
-       "end": 1135
+       "start": 1108,
+       "end": 1130
       }
      ]
     }
@@ -815,216 +890,216 @@
   },
   {
    "id": "break",
-   "from": 1201,
+   "from": 1200,
    "durationInFrames": 510,
    "lines": [
     {
      "voice": "narrator",
      "text": "This is a real run on our live server. A bad release breaks checkout. The sentinel agent takes the incident commander role in Switch, so exactly one agent is in charge, and writes what it found into a room document.",
      "file": "audio/vo/break_0.mp3",
-     "startFrame": 1213,
+     "startFrame": 1208,
      "durationFrames": 409,
      "estimated": false,
      "words": [
       {
        "word": "This",
-       "start": 1213,
-       "end": 1219
+       "start": 1208,
+       "end": 1214
       },
       {
        "word": "is",
-       "start": 1221,
-       "end": 1223
+       "start": 1216,
+       "end": 1218
       },
       {
        "word": "a",
-       "start": 1225,
-       "end": 1226
+       "start": 1220,
+       "end": 1221
       },
       {
        "word": "real",
-       "start": 1229,
-       "end": 1235
+       "start": 1224,
+       "end": 1230
       },
       {
        "word": "run",
-       "start": 1238,
-       "end": 1245
+       "start": 1233,
+       "end": 1240
       },
       {
        "word": "on",
-       "start": 1247,
-       "end": 1250
+       "start": 1242,
+       "end": 1245
       },
       {
        "word": "our",
-       "start": 1251,
-       "end": 1253
+       "start": 1246,
+       "end": 1248
       },
       {
        "word": "live",
-       "start": 1255,
-       "end": 1261
+       "start": 1250,
+       "end": 1256
       },
       {
        "word": "server.",
-       "start": 1262,
-       "end": 1279
+       "start": 1257,
+       "end": 1274
       },
       {
        "word": "A",
-       "start": 1290,
-       "end": 1293
+       "start": 1285,
+       "end": 1288
       },
       {
        "word": "bad",
-       "start": 1295,
-       "end": 1301
+       "start": 1290,
+       "end": 1296
       },
       {
        "word": "release",
-       "start": 1304,
-       "end": 1315
+       "start": 1299,
+       "end": 1310
       },
       {
        "word": "breaks",
-       "start": 1316,
-       "end": 1326
+       "start": 1311,
+       "end": 1321
       },
       {
        "word": "checkout.",
-       "start": 1327,
-       "end": 1346
+       "start": 1322,
+       "end": 1341
       },
       {
        "word": "The",
-       "start": 1362,
-       "end": 1365
+       "start": 1357,
+       "end": 1360
       },
       {
        "word": "sentinel",
-       "start": 1367,
-       "end": 1380
+       "start": 1362,
+       "end": 1375
       },
       {
        "word": "agent",
-       "start": 1382,
-       "end": 1393
+       "start": 1377,
+       "end": 1388
       },
       {
        "word": "takes",
-       "start": 1395,
-       "end": 1404
+       "start": 1390,
+       "end": 1399
       },
       {
        "word": "the",
-       "start": 1405,
-       "end": 1407
+       "start": 1400,
+       "end": 1402
       },
       {
        "word": "incident",
-       "start": 1409,
-       "end": 1420
+       "start": 1404,
+       "end": 1415
       },
       {
        "word": "commander",
-       "start": 1422,
-       "end": 1432
+       "start": 1417,
+       "end": 1427
       },
       {
        "word": "role",
-       "start": 1433,
-       "end": 1440
+       "start": 1428,
+       "end": 1435
       },
       {
        "word": "in",
-       "start": 1440,
-       "end": 1443
+       "start": 1435,
+       "end": 1438
       },
       {
        "word": "Switch,",
-       "start": 1445,
-       "end": 1461
+       "start": 1440,
+       "end": 1456
       },
       {
        "word": "so",
-       "start": 1469,
-       "end": 1473
+       "start": 1464,
+       "end": 1468
       },
       {
        "word": "exactly",
-       "start": 1475,
-       "end": 1489
+       "start": 1470,
+       "end": 1484
       },
       {
        "word": "one",
-       "start": 1492,
-       "end": 1498
+       "start": 1487,
+       "end": 1493
       },
       {
        "word": "agent",
-       "start": 1500,
-       "end": 1508
+       "start": 1495,
+       "end": 1503
       },
       {
        "word": "is",
-       "start": 1510,
-       "end": 1512
+       "start": 1505,
+       "end": 1507
       },
       {
        "word": "in",
-       "start": 1514,
-       "end": 1516
+       "start": 1509,
+       "end": 1511
       },
       {
        "word": "charge,",
-       "start": 1517,
-       "end": 1534
+       "start": 1512,
+       "end": 1529
       },
       {
        "word": "and",
-       "start": 1544,
-       "end": 1549
+       "start": 1539,
+       "end": 1544
       },
       {
        "word": "writes",
-       "start": 1550,
-       "end": 1558
+       "start": 1545,
+       "end": 1553
       },
       {
        "word": "what",
-       "start": 1559,
-       "end": 1563
+       "start": 1554,
+       "end": 1558
       },
       {
        "word": "it",
-       "start": 1564,
-       "end": 1566
+       "start": 1559,
+       "end": 1561
       },
       {
        "word": "found",
-       "start": 1568,
-       "end": 1577
+       "start": 1563,
+       "end": 1572
       },
       {
        "word": "into",
-       "start": 1579,
-       "end": 1584
+       "start": 1574,
+       "end": 1579
       },
       {
        "word": "a",
-       "start": 1587,
-       "end": 1587
+       "start": 1582,
+       "end": 1582
       },
       {
        "word": "room",
-       "start": 1590,
-       "end": 1595
+       "start": 1585,
+       "end": 1590
       },
       {
        "word": "document.",
-       "start": 1597,
-       "end": 1621
+       "start": 1592,
+       "end": 1616
       }
      ]
     }
@@ -1032,256 +1107,256 @@
   },
   {
    "id": "chat",
-   "from": 1711,
-   "durationInFrames": 660,
+   "from": 1710,
+   "durationInFrames": 651,
    "lines": [
     {
      "voice": "narrator",
      "text": "Then it hands the failing request to Claude Code, in the hotfix room, in Mattermost. Claude Code reproduces the error on the live service, recognizes it from an earlier incident, writes the fix and asks for a check. The whole team sees it happen in the same chat.",
      "file": "audio/vo/chat_0.mp3",
-     "startFrame": 1723,
+     "startFrame": 1718,
      "durationFrames": 545,
      "estimated": false,
      "words": [
       {
        "word": "Then",
-       "start": 1723,
-       "end": 1733
+       "start": 1718,
+       "end": 1728
       },
       {
        "word": "it",
-       "start": 1737,
-       "end": 1742
+       "start": 1732,
+       "end": 1737
       },
       {
        "word": "hands",
-       "start": 1743,
-       "end": 1751
+       "start": 1738,
+       "end": 1746
       },
       {
        "word": "the",
-       "start": 1753,
-       "end": 1755
+       "start": 1748,
+       "end": 1750
       },
       {
        "word": "failing",
-       "start": 1756,
-       "end": 1765
+       "start": 1751,
+       "end": 1760
       },
       {
        "word": "request",
-       "start": 1767,
-       "end": 1782
+       "start": 1762,
+       "end": 1777
       },
       {
        "word": "to",
-       "start": 1785,
-       "end": 1789
+       "start": 1780,
+       "end": 1784
       },
       {
        "word": "Claude",
-       "start": 1791,
-       "end": 1800
+       "start": 1786,
+       "end": 1795
       },
       {
        "word": "Code,",
-       "start": 1801,
-       "end": 1818
+       "start": 1796,
+       "end": 1813
       },
       {
        "word": "in",
-       "start": 1826,
-       "end": 1829
+       "start": 1821,
+       "end": 1824
       },
       {
        "word": "the",
-       "start": 1830,
-       "end": 1832
+       "start": 1825,
+       "end": 1827
       },
       {
        "word": "hotfix",
-       "start": 1834,
-       "end": 1846
+       "start": 1829,
+       "end": 1841
       },
       {
        "word": "room,",
-       "start": 1848,
-       "end": 1860
+       "start": 1843,
+       "end": 1855
       },
       {
        "word": "in",
-       "start": 1867,
-       "end": 1871
+       "start": 1862,
+       "end": 1866
       },
       {
        "word": "Mattermost.",
-       "start": 1873,
-       "end": 1897
+       "start": 1868,
+       "end": 1892
       },
       {
        "word": "Claude",
-       "start": 1931,
-       "end": 1941
+       "start": 1926,
+       "end": 1936
       },
       {
        "word": "Code",
-       "start": 1942,
-       "end": 1952
+       "start": 1937,
+       "end": 1947
       },
       {
        "word": "reproduces",
-       "start": 1954,
-       "end": 1973
+       "start": 1949,
+       "end": 1968
       },
       {
        "word": "the",
-       "start": 1974,
-       "end": 1977
+       "start": 1969,
+       "end": 1972
       },
       {
        "word": "error",
-       "start": 1979,
-       "end": 1987
+       "start": 1974,
+       "end": 1982
       },
       {
        "word": "on",
-       "start": 1989,
-       "end": 1992
+       "start": 1984,
+       "end": 1987
       },
       {
        "word": "the",
-       "start": 1993,
-       "end": 1995
+       "start": 1988,
+       "end": 1990
       },
       {
        "word": "live",
-       "start": 1997,
-       "end": 2004
+       "start": 1992,
+       "end": 1999
       },
       {
        "word": "service,",
-       "start": 2005,
-       "end": 2023
+       "start": 2000,
+       "end": 2018
       },
       {
        "word": "recognizes",
-       "start": 2035,
+       "start": 2030,
+       "end": 2047
+      },
+      {
+       "word": "it",
+       "start": 2049,
        "end": 2052
       },
       {
-       "word": "it",
-       "start": 2054,
-       "end": 2057
-      },
-      {
        "word": "from",
-       "start": 2059,
-       "end": 2063
+       "start": 2054,
+       "end": 2058
       },
       {
        "word": "an",
-       "start": 2065,
-       "end": 2066
+       "start": 2060,
+       "end": 2061
       },
       {
        "word": "earlier",
-       "start": 2069,
-       "end": 2079
+       "start": 2064,
+       "end": 2074
       },
       {
        "word": "incident,",
-       "start": 2081,
-       "end": 2100
+       "start": 2076,
+       "end": 2095
       },
       {
        "word": "writes",
-       "start": 2106,
-       "end": 2116
+       "start": 2101,
+       "end": 2111
       },
       {
        "word": "the",
-       "start": 2117,
-       "end": 2119
+       "start": 2112,
+       "end": 2114
       },
       {
        "word": "fix",
-       "start": 2121,
-       "end": 2130
+       "start": 2116,
+       "end": 2125
       },
       {
        "word": "and",
-       "start": 2134,
-       "end": 2139
+       "start": 2129,
+       "end": 2134
       },
       {
        "word": "asks",
-       "start": 2141,
-       "end": 2151
+       "start": 2136,
+       "end": 2146
       },
       {
        "word": "for",
-       "start": 2152,
-       "end": 2156
+       "start": 2147,
+       "end": 2151
       },
       {
        "word": "a",
-       "start": 2158,
-       "end": 2158
+       "start": 2153,
+       "end": 2153
       },
       {
        "word": "check.",
-       "start": 2160,
-       "end": 2175
+       "start": 2155,
+       "end": 2170
       },
       {
        "word": "The",
-       "start": 2188,
-       "end": 2191
+       "start": 2183,
+       "end": 2186
       },
       {
        "word": "whole",
-       "start": 2193,
-       "end": 2199
+       "start": 2188,
+       "end": 2194
       },
       {
        "word": "team",
-       "start": 2201,
-       "end": 2209
+       "start": 2196,
+       "end": 2204
       },
       {
        "word": "sees",
-       "start": 2211,
-       "end": 2216
+       "start": 2206,
+       "end": 2211
       },
       {
        "word": "it",
-       "start": 2217,
-       "end": 2219
+       "start": 2212,
+       "end": 2214
       },
       {
        "word": "happen",
-       "start": 2220,
-       "end": 2229
+       "start": 2215,
+       "end": 2224
       },
       {
        "word": "in",
-       "start": 2231,
-       "end": 2233
+       "start": 2226,
+       "end": 2228
       },
       {
        "word": "the",
-       "start": 2234,
-       "end": 2236
+       "start": 2229,
+       "end": 2231
       },
       {
        "word": "same",
-       "start": 2237,
-       "end": 2245
+       "start": 2232,
+       "end": 2240
       },
       {
        "word": "chat.",
-       "start": 2246,
-       "end": 2268
+       "start": 2241,
+       "end": 2263
       }
      ]
     }
@@ -1289,216 +1364,216 @@
   },
   {
    "id": "verify",
-   "from": 2371,
-   "durationInFrames": 457,
+   "from": 2361,
+   "durationInFrames": 450,
    "lines": [
     {
      "voice": "narrator",
      "text": "Vigil's patcher does not take its word for it. It runs the service's real tests and replays the failing request on a staging copy. Seven of seven checks pass. A fix that does not work never reaches the release room.",
      "file": "audio/vo/verify_0.mp3",
-     "startFrame": 2383,
+     "startFrame": 2369,
      "durationFrames": 430,
      "estimated": false,
      "words": [
       {
        "word": "Vigil's",
-       "start": 2383,
-       "end": 2397
+       "start": 2369,
+       "end": 2383
       },
       {
        "word": "patcher",
-       "start": 2398,
-       "end": 2411
+       "start": 2384,
+       "end": 2397
       },
       {
        "word": "does",
-       "start": 2414,
-       "end": 2420
+       "start": 2400,
+       "end": 2406
       },
       {
        "word": "not",
-       "start": 2422,
-       "end": 2427
+       "start": 2408,
+       "end": 2413
       },
       {
        "word": "take",
-       "start": 2429,
-       "end": 2435
+       "start": 2415,
+       "end": 2421
       },
       {
        "word": "its",
-       "start": 2436,
-       "end": 2439
+       "start": 2422,
+       "end": 2425
       },
       {
        "word": "word",
-       "start": 2440,
-       "end": 2446
+       "start": 2426,
+       "end": 2432
       },
       {
        "word": "for",
-       "start": 2447,
-       "end": 2451
+       "start": 2433,
+       "end": 2437
       },
       {
        "word": "it.",
-       "start": 2453,
-       "end": 2459
+       "start": 2439,
+       "end": 2445
       },
       {
        "word": "It",
-       "start": 2475,
-       "end": 2479
+       "start": 2461,
+       "end": 2465
       },
       {
        "word": "runs",
-       "start": 2481,
-       "end": 2487
+       "start": 2467,
+       "end": 2473
       },
       {
        "word": "the",
-       "start": 2489,
-       "end": 2491
+       "start": 2475,
+       "end": 2477
       },
       {
        "word": "service's",
-       "start": 2492,
-       "end": 2506
+       "start": 2478,
+       "end": 2492
       },
       {
        "word": "real",
-       "start": 2509,
-       "end": 2516
+       "start": 2495,
+       "end": 2502
       },
       {
        "word": "tests",
-       "start": 2517,
-       "end": 2530
+       "start": 2503,
+       "end": 2516
       },
       {
        "word": "and",
-       "start": 2537,
-       "end": 2542
+       "start": 2523,
+       "end": 2528
       },
       {
        "word": "replays",
-       "start": 2544,
-       "end": 2557
+       "start": 2530,
+       "end": 2543
       },
       {
        "word": "the",
-       "start": 2559,
-       "end": 2561
+       "start": 2545,
+       "end": 2547
       },
       {
        "word": "failing",
-       "start": 2563,
-       "end": 2572
+       "start": 2549,
+       "end": 2558
       },
       {
        "word": "request",
-       "start": 2574,
-       "end": 2587
+       "start": 2560,
+       "end": 2573
       },
       {
        "word": "on",
-       "start": 2590,
-       "end": 2593
+       "start": 2576,
+       "end": 2579
       },
       {
        "word": "a",
-       "start": 2594,
-       "end": 2595
+       "start": 2580,
+       "end": 2581
       },
       {
        "word": "staging",
-       "start": 2597,
-       "end": 2607
+       "start": 2583,
+       "end": 2593
       },
       {
        "word": "copy.",
-       "start": 2609,
-       "end": 2624
+       "start": 2595,
+       "end": 2610
       },
       {
        "word": "Seven",
-       "start": 2648,
-       "end": 2658
+       "start": 2634,
+       "end": 2644
       },
       {
        "word": "of",
-       "start": 2660,
-       "end": 2662
+       "start": 2646,
+       "end": 2648
       },
       {
        "word": "seven",
-       "start": 2664,
-       "end": 2672
+       "start": 2650,
+       "end": 2658
       },
       {
        "word": "checks",
-       "start": 2673,
-       "end": 2682
+       "start": 2659,
+       "end": 2668
       },
       {
        "word": "pass.",
-       "start": 2683,
-       "end": 2700
+       "start": 2669,
+       "end": 2686
       },
       {
        "word": "A",
-       "start": 2711,
-       "end": 2714
+       "start": 2697,
+       "end": 2700
       },
       {
        "word": "fix",
-       "start": 2717,
-       "end": 2724
+       "start": 2703,
+       "end": 2710
       },
       {
        "word": "that",
-       "start": 2726,
-       "end": 2730
+       "start": 2712,
+       "end": 2716
       },
       {
        "word": "does",
-       "start": 2731,
-       "end": 2735
+       "start": 2717,
+       "end": 2721
       },
       {
        "word": "not",
-       "start": 2737,
-       "end": 2741
+       "start": 2723,
+       "end": 2727
       },
       {
        "word": "work",
-       "start": 2743,
-       "end": 2750
+       "start": 2729,
+       "end": 2736
       },
       {
        "word": "never",
-       "start": 2758,
-       "end": 2766
+       "start": 2744,
+       "end": 2752
       },
       {
        "word": "reaches",
-       "start": 2768,
-       "end": 2778
+       "start": 2754,
+       "end": 2764
       },
       {
        "word": "the",
-       "start": 2779,
-       "end": 2781
+       "start": 2765,
+       "end": 2767
       },
       {
        "word": "release",
-       "start": 2783,
-       "end": 2793
+       "start": 2769,
+       "end": 2779
       },
       {
        "word": "room.",
-       "start": 2794,
-       "end": 2812
+       "start": 2780,
+       "end": 2798
       }
      ]
     }
@@ -1506,136 +1581,136 @@
   },
   {
    "id": "rogue",
-   "from": 2828,
+   "from": 2811,
    "durationInFrames": 360,
    "lines": [
     {
      "voice": "narrator",
      "text": "Now an agent tries to approve its own release. The gate is plain code, not a model. It sees an agent, and it refuses.",
      "file": "audio/vo/rogue_0.mp3",
-     "startFrame": 2840,
+     "startFrame": 2819,
      "durationFrames": 260,
      "estimated": false,
      "words": [
       {
        "word": "Now",
+       "start": 2819,
+       "end": 2828
+      },
+      {
+       "word": "an",
+       "start": 2833,
+       "end": 2837
+      },
+      {
+       "word": "agent",
        "start": 2840,
        "end": 2849
       },
       {
-       "word": "an",
-       "start": 2854,
+       "word": "tries",
+       "start": 2850,
        "end": 2858
       },
       {
-       "word": "agent",
-       "start": 2861,
-       "end": 2870
-      },
-      {
-       "word": "tries",
-       "start": 2871,
-       "end": 2879
-      },
-      {
        "word": "to",
-       "start": 2881,
-       "end": 2882
+       "start": 2860,
+       "end": 2861
       },
       {
        "word": "approve",
-       "start": 2884,
-       "end": 2893
+       "start": 2863,
+       "end": 2872
       },
       {
        "word": "its",
-       "start": 2894,
-       "end": 2897
+       "start": 2873,
+       "end": 2876
       },
       {
        "word": "own",
-       "start": 2899,
-       "end": 2903
+       "start": 2878,
+       "end": 2882
       },
       {
        "word": "release.",
-       "start": 2905,
-       "end": 2921
+       "start": 2884,
+       "end": 2900
       },
       {
        "word": "The",
-       "start": 2935,
-       "end": 2938
+       "start": 2914,
+       "end": 2917
       },
       {
        "word": "gate",
-       "start": 2940,
-       "end": 2948
+       "start": 2919,
+       "end": 2927
       },
       {
        "word": "is",
-       "start": 2949,
-       "end": 2953
+       "start": 2928,
+       "end": 2932
       },
       {
        "word": "plain",
-       "start": 2955,
-       "end": 2963
+       "start": 2934,
+       "end": 2942
       },
       {
        "word": "code,",
-       "start": 2965,
-       "end": 2980
+       "start": 2944,
+       "end": 2959
       },
       {
        "word": "not",
-       "start": 2987,
-       "end": 2993
+       "start": 2966,
+       "end": 2972
       },
       {
        "word": "a",
-       "start": 2994,
-       "end": 2995
+       "start": 2973,
+       "end": 2974
       },
       {
        "word": "model.",
-       "start": 2996,
-       "end": 3010
+       "start": 2975,
+       "end": 2989
       },
       {
        "word": "It",
-       "start": 3024,
-       "end": 3028
+       "start": 3003,
+       "end": 3007
       },
       {
        "word": "sees",
-       "start": 3030,
-       "end": 3037
+       "start": 3009,
+       "end": 3016
       },
       {
        "word": "an",
-       "start": 3038,
-       "end": 3040
+       "start": 3017,
+       "end": 3019
       },
       {
        "word": "agent,",
-       "start": 3042,
-       "end": 3057
+       "start": 3021,
+       "end": 3036
       },
       {
        "word": "and",
-       "start": 3059,
-       "end": 3064
+       "start": 3038,
+       "end": 3043
       },
       {
        "word": "it",
-       "start": 3065,
-       "end": 3067
+       "start": 3044,
+       "end": 3046
       },
       {
        "word": "refuses.",
-       "start": 3068,
-       "end": 3099
+       "start": 3047,
+       "end": 3078
       }
      ]
     }
@@ -1643,166 +1718,293 @@
   },
   {
    "id": "ship",
-   "from": 3188,
+   "from": 3171,
    "durationInFrames": 540,
    "lines": [
     {
      "voice": "narrator",
      "text": "Only a person can ship. One message in Mattermost. The gate deploys the verified commit, all five canary probes answer, and the postmortem is written. Seventy-seven seconds, alert to closed.",
      "file": "audio/vo/ship_0.mp3",
-     "startFrame": 3200,
+     "startFrame": 3179,
      "durationFrames": 388,
      "estimated": false,
      "words": [
       {
        "word": "Only",
-       "start": 3200,
-       "end": 3209
+       "start": 3179,
+       "end": 3188
       },
       {
        "word": "a",
-       "start": 3210,
-       "end": 3211
+       "start": 3189,
+       "end": 3190
       },
       {
        "word": "person",
-       "start": 3213,
-       "end": 3222
+       "start": 3192,
+       "end": 3201
       },
       {
        "word": "can",
-       "start": 3224,
-       "end": 3227
+       "start": 3203,
+       "end": 3206
       },
       {
        "word": "ship.",
-       "start": 3229,
-       "end": 3241
+       "start": 3208,
+       "end": 3220
       },
       {
        "word": "One",
-       "start": 3262,
-       "end": 3269
+       "start": 3241,
+       "end": 3248
       },
       {
        "word": "message",
-       "start": 3271,
-       "end": 3283
+       "start": 3250,
+       "end": 3262
       },
       {
        "word": "in",
-       "start": 3285,
-       "end": 3288
+       "start": 3264,
+       "end": 3267
       },
       {
        "word": "Mattermost.",
-       "start": 3290,
-       "end": 3312
+       "start": 3269,
+       "end": 3291
       },
       {
        "word": "The",
-       "start": 3325,
-       "end": 3329
+       "start": 3304,
+       "end": 3308
       },
       {
        "word": "gate",
-       "start": 3330,
-       "end": 3337
+       "start": 3309,
+       "end": 3316
       },
       {
        "word": "deploys",
-       "start": 3338,
-       "end": 3350
+       "start": 3317,
+       "end": 3329
       },
       {
        "word": "the",
-       "start": 3351,
-       "end": 3353
+       "start": 3330,
+       "end": 3332
       },
       {
        "word": "verified",
-       "start": 3354,
-       "end": 3367
+       "start": 3333,
+       "end": 3346
       },
       {
        "word": "commit,",
-       "start": 3368,
-       "end": 3383
+       "start": 3347,
+       "end": 3362
       },
       {
        "word": "all",
-       "start": 3387,
-       "end": 3393
+       "start": 3366,
+       "end": 3372
       },
       {
        "word": "five",
-       "start": 3395,
-       "end": 3404
+       "start": 3374,
+       "end": 3383
       },
       {
        "word": "canary",
-       "start": 3406,
-       "end": 3415
+       "start": 3385,
+       "end": 3394
       },
       {
        "word": "probes",
-       "start": 3417,
-       "end": 3425
+       "start": 3396,
+       "end": 3404
       },
       {
        "word": "answer,",
-       "start": 3426,
-       "end": 3442
+       "start": 3405,
+       "end": 3421
       },
       {
        "word": "and",
-       "start": 3446,
-       "end": 3450
+       "start": 3425,
+       "end": 3429
       },
       {
        "word": "the",
-       "start": 3452,
-       "end": 3454
+       "start": 3431,
+       "end": 3433
       },
       {
        "word": "postmortem",
-       "start": 3455,
-       "end": 3472
+       "start": 3434,
+       "end": 3451
       },
       {
        "word": "is",
-       "start": 3474,
-       "end": 3476
+       "start": 3453,
+       "end": 3455
       },
       {
        "word": "written.",
-       "start": 3477,
-       "end": 3490
+       "start": 3456,
+       "end": 3469
       },
       {
        "word": "Seventy-seven",
-       "start": 3508,
-       "end": 3530
+       "start": 3487,
+       "end": 3509
       },
       {
        "word": "seconds,",
-       "start": 3532,
-       "end": 3549
+       "start": 3511,
+       "end": 3528
       },
       {
        "word": "alert",
-       "start": 3551,
-       "end": 3560
+       "start": 3530,
+       "end": 3539
       },
       {
        "word": "to",
-       "start": 3562,
-       "end": 3563
+       "start": 3541,
+       "end": 3542
       },
       {
        "word": "closed.",
-       "start": 3565,
-       "end": 3587
+       "start": 3544,
+       "end": 3566
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "team",
+   "from": 3711,
+   "durationInFrames": 300,
+   "lines": [
+    {
+     "voice": "narrator",
+     "text": "On the next incident, a teammate shipped it. Nzubechukwu approved in Mattermost. And Claude Code still takes instructions only from its owner.",
+     "file": "audio/vo/team_0.mp3",
+     "startFrame": 3719,
+     "durationFrames": 257,
+     "estimated": false,
+     "words": [
+      {
+       "word": "On",
+       "start": 3719,
+       "end": 3724
+      },
+      {
+       "word": "the",
+       "start": 3725,
+       "end": 3727
+      },
+      {
+       "word": "next",
+       "start": 3728,
+       "end": 3735
+      },
+      {
+       "word": "incident,",
+       "start": 3736,
+       "end": 3750
+      },
+      {
+       "word": "a",
+       "start": 3754,
+       "end": 3756
+      },
+      {
+       "word": "teammate",
+       "start": 3758,
+       "end": 3770
+      },
+      {
+       "word": "shipped",
+       "start": 3771,
+       "end": 3779
+      },
+      {
+       "word": "it.",
+       "start": 3780,
+       "end": 3787
+      },
+      {
+       "word": "Nzubechukwu",
+       "start": 3802,
+       "end": 3827
+      },
+      {
+       "word": "approved",
+       "start": 3829,
+       "end": 3840
+      },
+      {
+       "word": "in",
+       "start": 3841,
+       "end": 3842
+      },
+      {
+       "word": "Mattermost.",
+       "start": 3844,
+       "end": 3862
+      },
+      {
+       "word": "And",
+       "start": 3872,
+       "end": 3877
+      },
+      {
+       "word": "Claude",
+       "start": 3878,
+       "end": 3887
+      },
+      {
+       "word": "Code",
+       "start": 3888,
+       "end": 3897
+      },
+      {
+       "word": "still",
+       "start": 3898,
+       "end": 3905
+      },
+      {
+       "word": "takes",
+       "start": 3906,
+       "end": 3913
+      },
+      {
+       "word": "instructions",
+       "start": 3914,
+       "end": 3933
+      },
+      {
+       "word": "only",
+       "start": 3937,
+       "end": 3945
+      },
+      {
+       "word": "from",
+       "start": 3947,
+       "end": 3951
+      },
+      {
+       "word": "its",
+       "start": 3952,
+       "end": 3955
+      },
+      {
+       "word": "owner.",
+       "start": 3957,
+       "end": 3975
       }
      ]
     }
@@ -1810,283 +2012,196 @@
   },
   {
    "id": "switch",
-   "from": 3728,
-   "durationInFrames": 630,
+   "from": 4011,
+   "durationInFrames": 549,
    "lines": [
     {
      "voice": "narrator",
      "text": "Switch holds this together. Three linked rooms carry the incident from triage, to the fix, to the release. Exclusive roles mean one commander and one patch author. Room documents keep the dossier, the test report and the release policy.",
      "file": "audio/vo/switch_0.mp3",
-     "startFrame": 3740,
+     "startFrame": 4019,
      "durationFrames": 496,
      "estimated": false,
      "words": [
       {
        "word": "Switch",
-       "start": 3740,
-       "end": 3751
+       "start": 4019,
+       "end": 4030
       },
       {
        "word": "holds",
-       "start": 3753,
-       "end": 3761
+       "start": 4032,
+       "end": 4040
       },
       {
        "word": "this",
-       "start": 3762,
-       "end": 3766
+       "start": 4041,
+       "end": 4045
       },
       {
        "word": "together.",
-       "start": 3768,
-       "end": 3785
+       "start": 4047,
+       "end": 4064
       },
       {
        "word": "Three",
-       "start": 3801,
-       "end": 3810
+       "start": 4080,
+       "end": 4089
       },
       {
        "word": "linked",
-       "start": 3812,
-       "end": 3820
+       "start": 4091,
+       "end": 4099
       },
       {
        "word": "rooms",
-       "start": 3821,
-       "end": 3833
+       "start": 4100,
+       "end": 4112
       },
       {
        "word": "carry",
-       "start": 3836,
-       "end": 3845
+       "start": 4115,
+       "end": 4124
       },
       {
        "word": "the",
-       "start": 3847,
-       "end": 3849
+       "start": 4126,
+       "end": 4128
       },
       {
        "word": "incident",
-       "start": 3850,
-       "end": 3863
+       "start": 4129,
+       "end": 4142
       },
       {
        "word": "from",
-       "start": 3865,
-       "end": 3870
+       "start": 4144,
+       "end": 4149
       },
       {
        "word": "triage,",
-       "start": 3872,
-       "end": 3893
+       "start": 4151,
+       "end": 4172
       },
       {
        "word": "to",
-       "start": 3896,
-       "end": 3900
+       "start": 4175,
+       "end": 4179
       },
       {
        "word": "the",
-       "start": 3902,
-       "end": 3904
+       "start": 4181,
+       "end": 4183
       },
       {
        "word": "fix,",
-       "start": 3905,
-       "end": 3921
+       "start": 4184,
+       "end": 4200
       },
       {
        "word": "to",
-       "start": 3927,
-       "end": 3930
+       "start": 4206,
+       "end": 4209
       },
       {
        "word": "the",
-       "start": 3932,
-       "end": 3934
+       "start": 4211,
+       "end": 4213
       },
       {
        "word": "release.",
-       "start": 3936,
-       "end": 3954
+       "start": 4215,
+       "end": 4233
       },
       {
        "word": "Exclusive",
-       "start": 3972,
-       "end": 3990
+       "start": 4251,
+       "end": 4269
       },
       {
        "word": "roles",
-       "start": 3991,
-       "end": 4001
+       "start": 4270,
+       "end": 4280
       },
       {
        "word": "mean",
-       "start": 4004,
-       "end": 4011
+       "start": 4283,
+       "end": 4290
       },
       {
        "word": "one",
-       "start": 4013,
-       "end": 4019
+       "start": 4292,
+       "end": 4298
       },
       {
        "word": "commander",
-       "start": 4020,
-       "end": 4035
+       "start": 4299,
+       "end": 4314
       },
       {
        "word": "and",
-       "start": 4037,
-       "end": 4042
+       "start": 4316,
+       "end": 4321
       },
       {
        "word": "one",
-       "start": 4044,
-       "end": 4050
+       "start": 4323,
+       "end": 4329
       },
       {
        "word": "patch",
-       "start": 4051,
-       "end": 4060
+       "start": 4330,
+       "end": 4339
       },
       {
        "word": "author.",
-       "start": 4062,
-       "end": 4076
+       "start": 4341,
+       "end": 4355
       },
       {
        "word": "Room",
-       "start": 4094,
-       "end": 4101
+       "start": 4373,
+       "end": 4380
       },
       {
        "word": "documents",
-       "start": 4103,
-       "end": 4118
+       "start": 4382,
+       "end": 4397
       },
       {
        "word": "keep",
-       "start": 4120,
-       "end": 4127
+       "start": 4399,
+       "end": 4406
       },
       {
        "word": "the",
-       "start": 4128,
-       "end": 4130
+       "start": 4407,
+       "end": 4409
       },
       {
        "word": "dossier,",
-       "start": 4131,
-       "end": 4152
+       "start": 4410,
+       "end": 4431
       },
       {
        "word": "the",
-       "start": 4158,
-       "end": 4161
+       "start": 4437,
+       "end": 4440
       },
       {
        "word": "test",
-       "start": 4163,
-       "end": 4170
+       "start": 4442,
+       "end": 4449
       },
       {
        "word": "report",
-       "start": 4171,
-       "end": 4184
+       "start": 4450,
+       "end": 4463
       },
       {
        "word": "and",
-       "start": 4188,
-       "end": 4195
-      },
-      {
-       "word": "the",
-       "start": 4196,
-       "end": 4198
-      },
-      {
-       "word": "release",
-       "start": 4200,
-       "end": 4210
-      },
-      {
-       "word": "policy.",
-       "start": 4211,
-       "end": 4236
-      }
-     ]
-    }
-   ]
-  },
-  {
-   "id": "unique",
-   "from": 4358,
-   "durationInFrames": 390,
-   "lines": [
-    {
-     "voice": "narrator",
-     "text": "So the agent you already use becomes a teammate. It writes the fix. Another agent checks it. And the keys to production stay with people.",
-     "file": "audio/vo/unique_0.mp3",
-     "startFrame": 4370,
-     "durationFrames": 260,
-     "estimated": false,
-     "words": [
-      {
-       "word": "So",
-       "start": 4370,
-       "end": 4375
-      },
-      {
-       "word": "the",
-       "start": 4377,
-       "end": 4379
-      },
-      {
-       "word": "agent",
-       "start": 4381,
-       "end": 4390
-      },
-      {
-       "word": "you",
-       "start": 4391,
-       "end": 4393
-      },
-      {
-       "word": "already",
-       "start": 4395,
-       "end": 4403
-      },
-      {
-       "word": "use",
-       "start": 4406,
-       "end": 4418
-      },
-      {
-       "word": "becomes",
-       "start": 4420,
-       "end": 4430
-      },
-      {
-       "word": "a",
-       "start": 4431,
-       "end": 4432
-      },
-      {
-       "word": "teammate.",
-       "start": 4433,
-       "end": 4451
-      },
-      {
-       "word": "It",
-       "start": 4461,
-       "end": 4465
-      },
-      {
-       "word": "writes",
-       "start": 4465,
-       "end": 4473
+       "start": 4467,
+       "end": 4474
       },
       {
        "word": "the",
@@ -2094,69 +2209,156 @@
        "end": 4477
       },
       {
-       "word": "fix.",
-       "start": 4478,
-       "end": 4494
+       "word": "release",
+       "start": 4479,
+       "end": 4489
       },
       {
-       "word": "Another",
-       "start": 4507,
-       "end": 4518
-      },
+       "word": "policy.",
+       "start": 4490,
+       "end": 4515
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "unique",
+   "from": 4560,
+   "durationInFrames": 390,
+   "lines": [
+    {
+     "voice": "narrator",
+     "text": "So the agent you already use becomes a teammate. It writes the fix. Another agent checks it. And the keys to production stay with people.",
+     "file": "audio/vo/unique_0.mp3",
+     "startFrame": 4568,
+     "durationFrames": 260,
+     "estimated": false,
+     "words": [
       {
-       "word": "agent",
-       "start": 4520,
-       "end": 4528
-      },
-      {
-       "word": "checks",
-       "start": 4529,
-       "end": 4538
-      },
-      {
-       "word": "it.",
-       "start": 4540,
-       "end": 4547
-      },
-      {
-       "word": "And",
-       "start": 4558,
-       "end": 4563
+       "word": "So",
+       "start": 4568,
+       "end": 4573
       },
       {
        "word": "the",
-       "start": 4564,
-       "end": 4566
+       "start": 4575,
+       "end": 4577
+      },
+      {
+       "word": "agent",
+       "start": 4579,
+       "end": 4588
+      },
+      {
+       "word": "you",
+       "start": 4589,
+       "end": 4591
+      },
+      {
+       "word": "already",
+       "start": 4593,
+       "end": 4601
+      },
+      {
+       "word": "use",
+       "start": 4604,
+       "end": 4616
+      },
+      {
+       "word": "becomes",
+       "start": 4618,
+       "end": 4628
+      },
+      {
+       "word": "a",
+       "start": 4629,
+       "end": 4630
+      },
+      {
+       "word": "teammate.",
+       "start": 4631,
+       "end": 4649
+      },
+      {
+       "word": "It",
+       "start": 4659,
+       "end": 4663
+      },
+      {
+       "word": "writes",
+       "start": 4663,
+       "end": 4671
+      },
+      {
+       "word": "the",
+       "start": 4673,
+       "end": 4675
+      },
+      {
+       "word": "fix.",
+       "start": 4676,
+       "end": 4692
+      },
+      {
+       "word": "Another",
+       "start": 4705,
+       "end": 4716
+      },
+      {
+       "word": "agent",
+       "start": 4718,
+       "end": 4726
+      },
+      {
+       "word": "checks",
+       "start": 4727,
+       "end": 4736
+      },
+      {
+       "word": "it.",
+       "start": 4738,
+       "end": 4745
+      },
+      {
+       "word": "And",
+       "start": 4756,
+       "end": 4761
+      },
+      {
+       "word": "the",
+       "start": 4762,
+       "end": 4764
       },
       {
        "word": "keys",
-       "start": 4567,
-       "end": 4574
+       "start": 4765,
+       "end": 4772
       },
       {
        "word": "to",
-       "start": 4576,
-       "end": 4578
+       "start": 4774,
+       "end": 4776
       },
       {
        "word": "production",
-       "start": 4579,
-       "end": 4594
+       "start": 4777,
+       "end": 4792
       },
       {
        "word": "stay",
-       "start": 4597,
-       "end": 4603
+       "start": 4795,
+       "end": 4801
       },
       {
        "word": "with",
-       "start": 4604,
-       "end": 4608
+       "start": 4802,
+       "end": 4806
       },
       {
        "word": "people.",
-       "start": 4609,
-       "end": 4629
+       "start": 4807,
+       "end": 4827
       }
      ]
     }
@@ -2164,81 +2366,81 @@
   },
   {
    "id": "close",
-   "from": 4748,
+   "from": 4950,
    "durationInFrames": 300,
    "lines": [
     {
      "voice": "narrator",
      "text": "Vigil. Built on Switch. Live at vigil dot netlayerlabs dot com.",
      "file": "audio/vo/close_0.mp3",
-     "startFrame": 4760,
+     "startFrame": 4958,
      "durationFrames": 152,
      "estimated": false,
      "words": [
       {
        "word": "Vigil.",
-       "start": 4760,
-       "end": 4778
+       "start": 4958,
+       "end": 4976
       },
       {
        "word": "Built",
-       "start": 4783,
-       "end": 4790
+       "start": 4981,
+       "end": 4988
       },
       {
        "word": "on",
-       "start": 4792,
-       "end": 4795
+       "start": 4990,
+       "end": 4993
       },
       {
        "word": "Switch.",
-       "start": 4797,
-       "end": 4813
+       "start": 4995,
+       "end": 5011
       },
       {
        "word": "Live",
-       "start": 4820,
-       "end": 4831
+       "start": 5018,
+       "end": 5029
       },
       {
        "word": "at",
-       "start": 4832,
-       "end": 4834
+       "start": 5030,
+       "end": 5032
       },
       {
        "word": "vigil",
-       "start": 4836,
-       "end": 4846
+       "start": 5034,
+       "end": 5044
       },
       {
        "word": "dot",
-       "start": 4847,
-       "end": 4854
+       "start": 5045,
+       "end": 5052
       },
       {
        "word": "net",
-       "start": 4856,
-       "end": 4861
+       "start": 5054,
+       "end": 5059
       },
       {
        "word": "layer",
-       "start": 4862,
-       "end": 4868
+       "start": 5060,
+       "end": 5066
       },
       {
        "word": "labs",
-       "start": 4870,
-       "end": 4879
+       "start": 5068,
+       "end": 5077
       },
       {
        "word": "dot",
-       "start": 4881,
-       "end": 4887
+       "start": 5079,
+       "end": 5085
       },
       {
        "word": "com.",
-       "start": 4890,
-       "end": 4912
+       "start": 5088,
+       "end": 5110
       }
      ]
     }

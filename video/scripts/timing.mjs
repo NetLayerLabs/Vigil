@@ -13,10 +13,10 @@ import { fileURLToPath } from "node:url";
 const ROOT = join(fileURLToPath(import.meta.url), "../..");
 const FPS = 30, MAX = 5250; // 2:55 ceiling
 const END_HOLD = { close: 130, turn: 30, open: 24 }; // min frames after last word, per scene
-const TRIM_ORDER = ["switch", "problem", "chat", "break", "verify", "unique", "ship", "gap", "open"];
+const TRIM_ORDER = ["switch", "team", "problem", "chat", "break", "verify", "unique", "ship", "gap", "open"];
 // Words the voice is given phonetically (script.json `say`) are shown as written.
-const DISPLAY = { lyve: "Live" };
-const show = (w) => { const k = w.toLowerCase().replace(/[^a-z]/g, ""); return DISPLAY[k] ? w.replace(/[A-Za-z]+/, DISPLAY[k]) : w; };
+const DISPLAY = { lyve: "Live", nzoobehchookwoo: "Nzubechukwu" };
+const show = (w) => { const k = w.toLowerCase().replace(/[^a-z]/g, ""); return DISPLAY[k] ? w.replace(/[A-Za-z][A-Za-z-]*/, DISPLAY[k]) : w; };
 const script = JSON.parse(readFileSync(join(ROOT, "script.json"), "utf8"));
 const dur = (f) => parseFloat(execFileSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "default=nw=1:nk=1", f]).toString());
 // Until the narration exists (ESTIMATE), words are placed at a natural 2.6 words/s with pauses at punctuation,
