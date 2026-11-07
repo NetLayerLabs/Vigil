@@ -7,3 +7,11 @@ dist/
 *.log
 .DS_Store
 coverage/
+
+# demo film: generated and private files
+video/node_modules/
+video/out/
+video/.cache/
+video/public/footage/
+video/public/stills/
+video/.capture.env
