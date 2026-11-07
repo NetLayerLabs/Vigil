@@ -1,0 +1,147 @@
+{
+ "mm_hotfix": {
+  "file": "footage/mm_hotfix.mp4",
+  "width": 1600,
+  "height": 900,
+  "durationFrames": 2994,
+  "marks": {
+   "run.chaos": 166,
+   "run.stage.triaged_escalated": 209,
+   "run.stage.reproducing_patching": 320,
+   "run.stage.awaiting_human_gate": 753,
+   "run.verified": 753,
+   "run.patchtab": 937,
+   "run.rogue": 1259,
+   "run.stage.resolved_promoted": 2539,
+   "run.closed": 2539
+  },
+  "deviceScale": 2,
+  "viewport": {
+   "w": 1600,
+   "h": 900
+  },
+  "url": "vigil-chat.netlayerlabs.com · #vigil-hotfix",
+  "rects": {}
+ },
+ "mm_releases": {
+  "file": "footage/mm_releases.mp4",
+  "width": 1600,
+  "height": 900,
+  "durationFrames": 3000,
+  "marks": {
+   "run.chaos": 166,
+   "run.stage.triaged_escalated": 209,
+   "run.stage.reproducing_patching": 320,
+   "run.stage.awaiting_human_gate": 753,
+   "run.verified": 753,
+   "run.patchtab": 937,
+   "run.rogue": 1259,
+   "run.stage.resolved_promoted": 2539,
+   "run.closed": 2539
+  },
+  "deviceScale": 2,
+  "viewport": {
+   "w": 1600,
+   "h": 900
+  },
+  "url": "vigil-chat.netlayerlabs.com · #vigil-releases",
+  "rects": {}
+ },
+ "switch": {
+  "file": "footage/switch.mp4",
+  "width": 3200,
+  "height": 1800,
+  "durationFrames": 971,
+  "marks": {
+   "switch.graph": 390,
+   "switch.row.vigil-incidents": 118,
+   "switch.row.vigil-hotfix": 157,
+   "switch.row.vigil-releases": 197,
+   "switch.room": 835
+  },
+  "deviceScale": 2,
+  "viewport": {
+   "w": 1600,
+   "h": 900
+  },
+  "url": "vigil-switch.netlayerlabs.com/rooms",
+  "rects": {
+   "table": null
+  }
+ },
+ "warroom": {
+  "file": "footage/warroom.mp4",
+  "width": 1600,
+  "height": 900,
+  "durationFrames": 3053,
+  "marks": {
+   "run.chaos": 166,
+   "run.stage.triaged_escalated": 209,
+   "run.stage.reproducing_patching": 320,
+   "run.stage.awaiting_human_gate": 753,
+   "run.verified": 753,
+   "run.patchtab": 937,
+   "run.rogue": 1259,
+   "run.stage.resolved_promoted": 2539,
+   "run.closed": 2539
+  },
+  "deviceScale": 2,
+  "viewport": {
+   "w": 1600,
+   "h": 900
+  },
+  "url": "vigil.netlayerlabs.com/app",
+  "rects": {}
+ },
+ "story_hotfix": {
+  "file": "footage/story_hotfix.mp4",
+  "width": 3200,
+  "height": 1800,
+  "durationFrames": 657,
+  "marks": {
+   "story_hotfix.scroll": 75,
+   "story_hotfix.bottom": 556
+  },
+  "deviceScale": 2,
+  "viewport": {
+   "w": 1600,
+   "h": 900
+  },
+  "url": "vigil-chat.netlayerlabs.com · #vigil-hotfix",
+  "rects": {}
+ },
+ "story_incidents": {
+  "file": "footage/story_incidents.mp4",
+  "width": 3200,
+  "height": 1800,
+  "durationFrames": 353,
+  "marks": {
+   "story_incidents.scroll": 75,
+   "story_incidents.bottom": 256
+  },
+  "deviceScale": 2,
+  "viewport": {
+   "w": 1600,
+   "h": 900
+  },
+  "url": "vigil-chat.netlayerlabs.com · #vigil-incidents",
+  "rects": {}
+ },
+ "story_releases": {
+  "file": "footage/story_releases.mp4",
+  "width": 3200,
+  "height": 1800,
+  "durationFrames": 528,
+  "marks": {
+   "story_releases.scroll": 75,
+   "story_releases.bottom": 435
+  },
+  "deviceScale": 2,
+  "viewport": {
+   "w": 1600,
+   "h": 900
+  },
+  "url": "vigil-chat.netlayerlabs.com · #vigil-releases",
+  "rects": {}
+ }
+}

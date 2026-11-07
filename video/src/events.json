@@ -1,0 +1,47 @@
+{
+ "warroom": {
+  "escalate": 243,
+  "claudeVerify": 667,
+  "fixVerified": 704,
+  "claudeDone": 1016,
+  "handoff": 718,
+  "needsHuman": 747,
+  "rogueApprove": 1258,
+  "rogueRefused": 1282,
+  "approve": 2430,
+  "deploying": 2477,
+  "shipped": 2493,
+  "opened": 184,
+  "closed": 2584
+ },
+ "mm_hotfix": {
+  "escalate": 243,
+  "claudeVerify": 667,
+  "fixVerified": 704,
+  "claudeDone": 1016,
+  "handoff": 718,
+  "needsHuman": 747,
+  "rogueApprove": 1258,
+  "rogueRefused": 1282,
+  "approve": 2430,
+  "deploying": 2477,
+  "shipped": 2493,
+  "opened": 184,
+  "closed": 2584
+ },
+ "mm_releases": {
+  "escalate": 243,
+  "claudeVerify": 667,
+  "fixVerified": 704,
+  "claudeDone": 1016,
+  "handoff": 718,
+  "needsHuman": 747,
+  "rogueApprove": 1258,
+  "rogueRefused": 1282,
+  "approve": 2430,
+  "deploying": 2477,
+  "shipped": 2493,
+  "opened": 184,
+  "closed": 2584
+ }
+}

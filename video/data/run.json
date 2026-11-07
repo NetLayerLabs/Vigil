@@ -1,0 +1,147 @@
+{
+ "checkedAt": "2026-11-06T23:49:57.501Z",
+ "source": "https://vigil.netlayerlabs.com/api/state",
+ "incident": {
+  "incidentId": "INC-2046",
+  "scenarioId": "jpy_zero_decimal_500",
+  "title": "v2.14.0 Zero-Decimal Currency Crash (JPY/KRW)",
+  "stage": "resolved_promoted",
+  "alert": {
+   "incidentId": "INC-2046",
+   "scenarioId": "jpy_zero_decimal_500",
+   "service": "checkout-api",
+   "deployedVersion": "v2.14.0",
+   "lastKnownGoodVersion": "v2.13.2",
+   "suspectedCommit": {
+    "sha": "9875987",
+    "author": "Alex Rivera (seeded) <alex@example.com>",
+    "message": "refactor(pricing): migrate to shared ISO-4217 scale table (zero-decimal synced lazily)",
+    "filePath": "services/checkout-api/src/cartPricing.ts",
+    "line": 48
+   },
+   "endpoint": "POST /api/checkout",
+   "httpStatus": 500,
+   "errorRatePct": 100,
+   "p99LatencyMs": 1.8,
+   "errorMessage": "TypeError: Cannot read properties of undefined (reading 'minorScale')",
+   "stackTrace": "TypeError: Cannot read properties of undefined (reading 'minorScale')\n    at applyPromotions (/opt/vigil/.vigil-state/checkout-api-live-4020/src/cartPricing.ts:81:55)\n    at authorizeCheckout (/opt/vigil/.vigil-state/checkout-api-live-4020/src/cartPricing.ts:141:42)\n    at Server.<anonymous> (/opt/vigil/.vigil-state/checkout-api-live-4020/src/server.ts:136:22)\n    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)",
+   "reproductionPayload": {
+    "cartId": "cart_tokyo_992_0",
+    "currency": "JPY",
+    "items": [
+     {
+      "sku": "PRO-SEAT-ANNUAL",
+      "qty": 2,
+      "unitPriceMajor": 4800
+     }
+    ],
+    "promoCodes": []
+   },
+   "detectedAt": 1794008901856
+  },
+  "patchVerification": {
+   "scenarioId": "jpy_zero_decimal_500",
+   "reproConfirmed": true,
+   "reproErrorOutput": "HTTP 500 TypeError: Cannot read properties of undefined (reading 'minorScale')",
+   "candidateVersion": "v2.14.1-hotfix",
+   "candidateSha": "26c3213",
+   "diffUnified": "diff --git a/src/cartPricing.ts b/src/cartPricing.ts\nindex 6ff8db7..f933c9a 100644\n--- a/src/cartPricing.ts\n+++ b/src/cartPricing.ts\n@@ -45,15 +45,16 @@ export class CheckoutError extends Error {\n // ---------------------------------------------------------------------------------------------\n // Currency scale table (ISO-4217 minor units). Zero-decimal currencies have a scale of 1.\n // ---------------------------------------------------------------------------------------------\n-// Migrated to the shared ISO-4217 scale table; zero-decimal currencies are added lazily by the FX sync job.\n-const CURRENCY_SCALE_MAP: Partial<Record<CurrencyCode, { minorScale: number }>> = {\n+const CURRENCY_SCALE_MAP: Record<CurrencyCode, { minorScale: number }> = {\n   USD: { minorScale: 100 },\n   EUR: { minorScale: 100 },\n   GBP: { minorScale: 100 },\n+  JPY: { minorScale: 1 },\n+  KRW: { minorScale: 1 },\n };\n \n export function toMinorUnits(amountMajor: number, currency: CurrencyCode): number {\n-  const scale = CURRENCY_SCALE_MAP[currency]!.minorScale;\n+  const scale = CURRENCY_SCALE_MAP[currency].minorScale;\n   return Math.round(amountMajor * scale);\n }\n \n@@ -78,7 +79,7 @@ export function applyPromotions(\n   const uniqueCodes = Array.from(new Set(codes.map((c) => c.trim().toUpperCase())));\n   const applied = uniqueCodes.filter((c) => PROMOS[c] !== undefined);\n   const discount = applied.reduce((sum, c) => sum + PROMOS[c], 0);\n-  const minFloorMajor = CURRENCY_SCALE_MAP[currency]!.minorScale === 1 ? 50 : 1;\n+  const minFloorMajor = CURRENCY_SCALE_MAP[currency].minorScale === 1 ? 50 : 1;\n   const discountedMajor = Math.max(minFloorMajor, subtotalMajor - discount);\n   return { discountedMajor, applied };\n }\n@@ -130,6 +131,9 @@ export function authorizeCheckout(req: CheckoutRequest, inventoryPool: Inventory\n   if (!req.items || req.items.length === 0) {\n     throw new CheckoutError('EmptyCartError', `Cart ${req.cartId} has no items`, 400);\n   }\n+  if (!CURRENCY_SCALE_MAP[req.currency]) {\n+    throw new CheckoutError('UnsupportedCurrencyError', `Unsupported currency '${req.currency}'`, 400);\n+  }\n \n   const reservationId = inventoryPool.acquire(req.cartId);\n   try {",
+   "changedLines": 12,
+   "touchedFiles": [
+    "services/checkout-api/src/cartPricing.ts"
+   ],
+   "testMatrix": [
+    {
+     "name": "patch applies cleanly to the regressed working copy (git apply --check)",
+     "passed": true,
+     "detail": "picked up uncommitted working-copy edits (1 file(s))"
+    },
+    {
+     "name": "Fault jpy_zero_decimal_500 no longer reproduces on candidate (staging probe)",
+     "passed": true,
+     "detail": "staging :38361 replayed production payload -> HTTP 200 charge=10368"
+    },
+    {
+     "name": "USD standard checkout ($99.00) charges 10692 cents incl. 8% tax",
+     "passed": true,
+     "detail": "passed"
+    },
+    {
+     "name": "JPY zero-decimal checkout (¥9,600) charges ¥10368 with scale 1",
+     "passed": true,
+     "detail": "passed"
+    },
+    {
+     "name": "KRW zero-decimal checkout (₩55,000) prices without throwing",
+     "passed": true,
+     "detail": "passed"
+    },
+    {
+     "name": "Stacked and duplicate promo codes are deduplicated and floored, never negative",
+     "passed": true,
+     "detail": "passed"
+    },
+    {
+     "name": "Fraud-declined checkouts release their inventory reservation (no semaphore leak)",
+     "passed": true,
+     "detail": "passed"
+    }
+   ],
+   "allPassed": true,
+   "testRunOutput": "TAP version 13\n# Subtest: USD standard checkout ($99.00) charges 10692 cents incl. 8% tax\nok 1 - USD standard checkout ($99.00) charges 10692 cents incl. 8% tax\n  ---\n  duration_ms: 2.057911\n  type: 'test'\n  ...\n# Subtest: JPY zero-decimal checkout (¥9,600) charges ¥10368 with scale 1\nok 2 - JPY zero-decimal checkout (¥9,600) charges ¥10368 with scale 1\n  ---\n  duration_ms: 0.192392\n  type: 'test'\n  ...\n# Subtest: KRW zero-decimal checkout (₩55,000) prices without throwing\nok 3 - KRW zero-decimal checkout (₩55,000) prices without throwing\n  ---\n  duration_ms: 0.157036\n  type: 'test'\n  ...\n# Subtest: Stacked and duplicate promo codes are deduplicated and floored, never negative\nok 4 - Stacked and duplicate promo codes are deduplicated and floored, never negative\n  ---\n  duration_ms: 0.830111\n  type: 'test'\n  ...\n# Subtest: Fraud-declined checkouts release their inventory reservation (no semaphore leak)\nok 5 - Fraud-declined checkouts release their inventory reservation (no semaphore leak)\n  ---\n  duration_ms: 0.796347\n  type: 'test'\n  ...\n1..5\n# tests 5\n# suites 0\n# pass 5\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 170.934583\n",
+   "author": "claude-code",
+   "source": "external-coder"
+  },
+  "gateDecisions": [
+   {
+    "allowed": false,
+    "action": null,
+    "incidentIdCited": null,
+    "reasonCode": "REJECTED_AGENT_SENDER",
+    "explanation": "Blocked autonomous self-approval from agent participant 'vigil-patcher' (@switch-agent-cf7687f9:localhost). Production changes require a verified human teammate.",
+    "timestamp": 1794008938905,
+    "senderName": "vigil-patcher"
+   },
+   {
+    "allowed": false,
+    "action": null,
+    "incidentIdCited": null,
+    "reasonCode": "REJECTED_AGENT_SENDER",
+    "explanation": "Blocked autonomous self-approval from agent participant 'claude-code' (@switch-agent-9b5f3602:localhost). Production changes require a verified human teammate.",
+    "timestamp": 1794008938976,
+    "senderName": "claude-code"
+   },
+   {
+    "allowed": true,
+    "action": "promote",
+    "incidentIdCited": "INC-2046",
+    "reasonCode": "APPROVED_PROMOTE",
+    "explanation": "priya approved v2.14.1-hotfix by claude-code for INC-2046: 12 changed lines (policy max 40), 7 of 7 checks passed.",
+    "timestamp": 1794008978805,
+    "senderName": "priya"
+   }
+  ],
+  "canaryReport": {
+   "probesRun": 5,
+   "probesPassed": 5,
+   "maxLatencyMs": 5,
+   "healthy": true,
+   "details": [
+    "USD: 200 OK [10692 minor, 5ms]",
+    "EUR: 200 OK [9612 minor, 2ms]",
+    "JPY: 200 OK [10368 minor, 2ms]",
+    "KRW: 200 OK [59400 minor, 2ms]",
+    "USD promo: 200 OK [108 minor, 2ms]"
+   ]
+  },
+  "finalVersion": "v2.14.1-hotfix",
+  "openedAt": 1794008901891,
+  "resolvedAt": 1794008979109,
+  "workroom": {
+   "roomId": "ead09c69-c9e2-4a13-9121-7d1236ee558c",
+   "roomName": "hotfix-INC-2046",
+   "archived": true
+  },
+  "patchMode": "external"
+ }
+}
