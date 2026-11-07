@@ -129,7 +129,7 @@ export class ReleaseSafetyGate {
           policy.requireGreenMatrix = !/^(false|no|0|off)$/i.test(value);
           break;
         case 'allowed_approvers':
-          policy.allowedApprovers = /^(any|any-human|anyone|\*)$/i.test(value) ? ['any-human'] : list();
+          policy.allowedApprovers = /^(any|any-human|anyone|\*)$/i.test(value) ? ['any-human'] : list().filter(ReleaseSafetyGate.isPlainHandle);
           break;
         case 'min_canary_probes': {
           const n = Number(value);
@@ -142,6 +142,80 @@ export class ReleaseSafetyGate {
   }
 
   /** Render the human-readable + machine-readable policy document body. */
+  /**
+   * Who the gate @-mentions when a fix needs a decision: the approvers named in the policy, so whoever is
+   * on call is pinged; the release owner when any person may approve. Only plain chat handles are used, and
+   * never a channel-wide mention (@all, @channel, @here), so a policy edit cannot page a whole room.
+   */
+  public static approverMentions(policy: ReleasePolicy, owner: string, agentNames: Iterable<string> = []): string {
+    const agents = new Set([...agentNames].map((a) => a.toLowerCase()));
+    const handles = policy.allowedApprovers.includes('any-human')
+      ? []
+      : policy.allowedApprovers.filter((h) => ReleaseSafetyGate.isPlainHandle(h) && !agents.has(h.toLowerCase())).slice(0, 10);
+    return (handles.length ? handles : [owner]).map((h) => `@${h}`).join(' ');
+  }
+
+  /**
+   * A chat username that is safe to @-mention: letters, digits, '.', '_' or '-', starting and ending with a
+   * letter or digit. Mattermost strips trailing '.', '-', ':' and '_' before matching special mentions, so
+   * requiring an alphanumeric last character (plus the explicit list) keeps @all, @channel, @here and
+   * @everyone, in any disguise, out of the gate's messages.
+   */
+  public static isPlainHandle(h: string): boolean {
+    if (!/^[a-z0-9](?:[a-z0-9._-]{0,62}[a-z0-9])?$/i.test(h)) return false;
+    return !['all', 'channel', 'here', 'everyone'].includes(h.toLowerCase().replace(/[._-]+$/, ''));
+  }
+
+  /** A name from an author or a sender, shown in the gate's messages: plain text only, else the fallback. */
+  public static safeName(name: string | undefined | null, fallback: string): string {
+    const n = (name ?? '').trim();
+    return /^[a-z0-9][a-z0-9._ -]{0,63}$/i.test(n) ? n : fallback;
+  }
+
+  /**
+   * Text from outside Vigil (a service response, an alert) inside a chat message: one line, no backticks,
+   * inside a code span, with '@' defused (zero-width space), so it cannot format the message, address an
+   * agent or page anyone, whichever reader (Mattermost or Switch's addressing) sees it.
+   */
+  public static quoteUntrusted(text: string, max = 160): string {
+    const clean = String(text).replace(/[`\r\n]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max).replace(/@/g, '@\u200b');
+    return `\`${clean}\``;
+  }
+
+  /**
+   * The reproduced evidence for the person who approves, from Vigil's own checks rather than the author's
+   * summary: the failure as the patcher reproduced it on the live service, and the same request replayed on
+   * the candidate on staging.
+   */
+  public static describeEvidence(v: PatchVerificationResult | null | undefined, liveVersion: string): string[] {
+    if (!v) return [];
+    const lines: string[] = [];
+    // Response text comes from the service and the candidate, the version from the alert: quoted, so it can
+    // never format the message, address an agent or @-mention anyone.
+    const quote = (text: string) => ReleaseSafetyGate.quoteUntrusted(text);
+    if (v.reproConfirmed && v.reproErrorOutput) {
+      lines.push(`- Before, on live ${quote(liveVersion)}: ${quote(v.reproErrorOutput)}`);
+    }
+    let replay = v.stagingReplay;
+    if (replay === undefined) {
+      // Records written before stagingReplay existed: read it back from the staging check's detail.
+      const row = v.testMatrix.find((t) => /staging probe/.test(t.name));
+      const m = row?.detail.match(/HTTP (\d{3})(?: charge=(\d+))?/);
+      replay = m ? { httpStatus: Number(m[1]), ...(m[2] ? { chargeMinorUnits: Number(m[2]) } : {}) } : null;
+    }
+    if (replay) {
+      const status = Number.isInteger(replay.httpStatus) ? replay.httpStatus : 0;
+      const charge = typeof replay.chargeMinorUnits === 'number' && Number.isFinite(replay.chargeMinorUnits) ? replay.chargeMinorUnits : undefined;
+      const result = status === 0
+        ? `no response${replay.error ? ` ${quote(replay.error)}` : ''}`
+        : charge !== undefined
+          ? `HTTP ${status}, charge ${charge} (minor units)`
+          : `HTTP ${status}${replay.error ? ` ${quote(replay.error)}` : ''}`;
+      lines.push(`- After, the same request on staging with the fix: ${result}`);
+    }
+    return lines;
+  }
+
   public static renderPolicyDocument(policy: ReleasePolicy, changedBy?: string, team = 'vigil'): string {
     return [
       '# Release policy',
@@ -187,7 +261,8 @@ export class ReleaseSafetyGate {
       const raw = m[1].trim();
       const value = /^(any|anyone|any-human|\*)$/i.test(raw)
         ? ['any-human']
-        : raw.split(/[,\s]+/).map((x) => x.replace(/^@/, '').toLowerCase()).filter(Boolean);
+        : raw.split(/[,\s]+/).map((x) => x.replace(/^@/, '').toLowerCase()).filter(ReleaseSafetyGate.isPlainHandle);
+      if (!value.length) return null;
       return { field: 'allowedApprovers', value, summary: `allowed_approvers -> ${value.join(', ')}` };
     }
     m = text.match(/\bset\s+forbidden[\s_-]?paths?\s+(?:to\s+)?([^\s].*?)\s*$/i);

@@ -64,6 +64,8 @@ export interface IncidentLedgerRecord {
   workroom: { roomId: string; roomName: string; archived: boolean } | null;
   /** Which patcher the incident was routed to. */
   patchMode: PatchMode;
+  /** The candidate commit the gate last asked people to decide on, so it asks once per candidate. */
+  decisionAskedFor?: string | null;
 }
 
 export interface VigilMeshOptions {
@@ -864,7 +866,7 @@ export class VigilMeshCoordinator {
           await this.patcherClient.postMessage(event.room_id, `No open incident to verify.`);
           return;
         }
-        const author = event.payload.sender_name || event.payload.sender;
+        const author = ReleaseSafetyGate.safeName(event.payload.sender_name, this.getExternalCoderHandle());
         await this.patcherClient.assumeRole(this.roomsByRole.hotfixRoomId, 'red-team-verifier').catch(() => undefined);
         await this.patcherClient.postMessage(
           event.room_id,
@@ -887,7 +889,7 @@ export class VigilMeshCoordinator {
           await this.patcherClient.postMessage(event.room_id, `No open incident to verify a patch against.`);
           return;
         }
-        const author = event.payload.sender_name || event.payload.sender;
+        const author = ReleaseSafetyGate.safeName(event.payload.sender_name, this.getExternalCoderHandle());
         await this.patcherClient.postMessage(
           event.room_id,
           `**${active.incidentId}: diff received from ${author}.** Running the reproduction and the tests.`,
@@ -968,7 +970,7 @@ export class VigilMeshCoordinator {
     const rec = this.incidents.get(incidentId.toUpperCase());
     if (!rec) throw new Error(`Unknown incident ${incidentId}`);
     if (rec.resolvedAt !== null) throw new Error(`${rec.incidentId} is already resolved`);
-    const author = submission.author?.trim() || this.getExternalCoderHandle();
+    const author = ReleaseSafetyGate.safeName(submission.author, this.getExternalCoderHandle());
     const hotfixRoomId = this.roomsByRole.hotfixRoomId;
     await this.patcherClient.assumeRole(hotfixRoomId, 'red-team-verifier').catch(() => undefined);
     await this.patcherClient.postMessage(
@@ -1206,22 +1208,31 @@ export class VigilMeshCoordinator {
         const incidentId = handoffMatch[1].toUpperCase();
         const rec = this.incidents.get(incidentId);
         if (!rec) return;
+        // Ask for a decision only in the releases room, only for an open incident with a verified candidate,
+        // and only once per candidate: quoting the tag (by an agent or a person) cannot re-page the approvers
+        // or reopen a closed incident.
+        const verified = rec.patchVerification;
+        if (event.room_id !== releasesRoomId || rec.resolvedAt !== null || !verified?.allPassed || !verified.candidateSha) return;
+        if (rec.decisionAskedFor === verified.candidateSha) return;
+        rec.decisionAskedFor = verified.candidateSha;
 
         rec.stage = 'awaiting_human_gate';
         this.opts.onEventUpdate?.();
 
         await this.releaseGateClient.assumeRole(releasesRoomId, 'release-gatekeeper');
-        const operator = this.opts.creatorUsername ?? 'priya';
+        const policy = await this.loadReleasePolicy();
         const v = rec.patchVerification;
         const gateName = `${this.teamPrefix}-release-gate`;
+        const evidence = ReleaseSafetyGate.describeEvidence(v, rec.alert.deployedVersion);
 
         await this.releaseGateClient.postMessage(
           releasesRoomId,
           [
-            `**${incidentId} needs a human decision.** @${operator}`,
+            `**${incidentId} needs a human decision.** ${ReleaseSafetyGate.approverMentions(policy, this.opts.creatorUsername ?? 'priya', this.knownAgentNames)}`,
             `- Incident: ${rec.title} (commit \`${rec.alert.suspectedCommit.sha}\`)`,
+            ...evidence,
             `- Fix: \`${v?.candidateVersion ?? 'v2.14.1-hotfix'}\` by ${v?.author ?? 'vigil-patcher'}, ${v?.changedLines ?? 0} changed lines, ${v?.testMatrix.filter((t) => t.passed).length ?? 0} of ${v?.testMatrix.length ?? 0} checks passed`,
-            `- Policy: at most ${this.releasePolicy.maxChangedLines} changed lines; approvers: ${this.releasePolicy.allowedApprovers.join(', ')}`,
+            `- Policy: at most ${policy.maxChangedLines} changed lines; approvers: ${policy.allowedApprovers.join(', ')}`,
             `- Rollback target: \`${rec.alert.lastKnownGoodVersion}\``,
             '',
             `Reply with one of these. Approvals from agents are refused.`,
