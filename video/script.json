@@ -1,0 +1,140 @@
+{
+ "title": "Vigil: Claude Code fixes the outage. A person ships it.",
+ "model": "eleven_multilingual_v2",
+ "voices": {
+  "narrator": {
+   "name": "Matilda",
+   "id": "XrExE9yKIg1WjnnlVkGX",
+   "settings": {
+    "stability": 0.5,
+    "similarity_boost": 0.8,
+    "style": 0.2,
+    "use_speaker_boost": true
+   }
+  }
+ },
+ "scenes": [
+  {
+   "id": "open",
+   "seconds": 9,
+   "lines": [
+    {
+     "voice": "narrator",
+     "text": "One line in a team chat. Approve, promote. Typed by a person, it is the only way this fix reaches production."
+    }
+   ]
+  },
+  {
+   "id": "problem",
+   "seconds": 17,
+   "lines": [
+    {
+     "voice": "narrator",
+     "text": "Teams already let coding agents fix bugs. But in an outage, the agent sits in one engineer's terminal. Nobody else sees what it found. Two people can stage two different fixes. And an agent that holds the deploy keys can ship its own change."
+    }
+   ]
+  },
+  {
+   "id": "gap",
+   "seconds": 6,
+   "lines": [
+    {
+     "voice": "narrator",
+     "text": "What's missing is not a smarter model. It's a room with rules."
+    }
+   ]
+  },
+  {
+   "id": "turn",
+   "seconds": 8,
+   "lines": [
+    {
+     "voice": "narrator",
+     "text": "Meet Vigil. Claude Code fixes the outage. A person ships it. Built on Switch.",
+     "say": "Meet Vigil. Claude Code fixes the outage. A person ships it. Built on Switch."
+    }
+   ]
+  },
+  {
+   "id": "break",
+   "seconds": 17,
+   "lines": [
+    {
+     "voice": "narrator",
+     "text": "This is a real run on our live server. A bad release breaks checkout. The sentinel agent takes the incident commander role in Switch, so exactly one agent is in charge, and writes what it found into a room document."
+    }
+   ]
+  },
+  {
+   "id": "chat",
+   "seconds": 22,
+   "lines": [
+    {
+     "voice": "narrator",
+     "text": "Then it hands the failing request to Claude Code, in the hotfix room, in Mattermost. Claude Code reproduces the error on the live service, recognizes it from an earlier incident, writes the fix and asks for a check. The whole team sees it happen in the same chat."
+    }
+   ]
+  },
+  {
+   "id": "verify",
+   "seconds": 15,
+   "lines": [
+    {
+     "voice": "narrator",
+     "text": "Vigil's patcher does not take its word for it. It runs the service's real tests and replays the failing request on a staging copy. Seven of seven checks pass. A fix that does not work never reaches the release room."
+    }
+   ]
+  },
+  {
+   "id": "rogue",
+   "seconds": 12,
+   "lines": [
+    {
+     "voice": "narrator",
+     "text": "Now an agent tries to approve its own release. The gate is plain code, not a model. It sees an agent, and it refuses."
+    }
+   ]
+  },
+  {
+   "id": "ship",
+   "seconds": 18,
+   "lines": [
+    {
+     "voice": "narrator",
+     "text": "Only a person can ship. One message in Mattermost. The gate deploys the verified commit, all five canary probes answer, and the postmortem is written. Seventy-seven seconds, alert to closed."
+    }
+   ]
+  },
+  {
+   "id": "switch",
+   "seconds": 21,
+   "lines": [
+    {
+     "voice": "narrator",
+     "text": "Switch holds this together. Three linked rooms carry the incident from triage, to the fix, to the release. Exclusive roles mean one commander and one patch author. Room documents keep the dossier, the test report and the release policy."
+    }
+   ]
+  },
+  {
+   "id": "unique",
+   "seconds": 13,
+   "lines": [
+    {
+     "voice": "narrator",
+     "text": "So the agent you already use becomes a teammate. It writes the fix. Another agent checks it. And the keys to production stay with people."
+    }
+   ]
+  },
+  {
+   "id": "close",
+   "seconds": 10,
+   "lines": [
+    {
+     "voice": "narrator",
+     "text": "Vigil. Built on Switch. Live at vigil dot netlayerlabs dot com.",
+     "say": "Vigil. Built on Switch. Live at vigil dot net layer labs dot com."
+    }
+   ]
+  }
+ ]
+}

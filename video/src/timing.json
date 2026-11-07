@@ -1,0 +1,2248 @@
+{
+ "fps": 30,
+ "totalFrames": 5048,
+ "bpm": 100,
+ "beats": [
+  1,
+  19,
+  37,
+  55,
+  73,
+  91,
+  109,
+  127,
+  145,
+  163,
+  181,
+  199,
+  217,
+  235,
+  253,
+  271,
+  289,
+  307,
+  325,
+  343,
+  361,
+  379,
+  397,
+  415,
+  433,
+  451,
+  469,
+  487,
+  505,
+  523,
+  541,
+  559,
+  577,
+  595,
+  613,
+  631,
+  649,
+  667,
+  685,
+  703,
+  721,
+  739,
+  757,
+  775,
+  793,
+  811,
+  829,
+  847,
+  865,
+  883,
+  901,
+  919,
+  937,
+  955,
+  973,
+  991,
+  1009,
+  1027,
+  1045,
+  1063,
+  1081,
+  1099,
+  1117,
+  1135,
+  1153,
+  1171,
+  1189,
+  1207,
+  1225,
+  1243,
+  1261,
+  1279,
+  1297,
+  1315,
+  1333,
+  1351,
+  1369,
+  1387,
+  1405,
+  1423,
+  1441,
+  1459,
+  1477,
+  1495,
+  1513,
+  1531,
+  1549,
+  1567,
+  1585,
+  1603,
+  1621,
+  1639,
+  1657,
+  1675,
+  1693,
+  1711,
+  1729,
+  1747,
+  1765,
+  1783,
+  1801,
+  1819,
+  1837,
+  1855,
+  1873,
+  1891,
+  1909,
+  1927,
+  1945,
+  1963,
+  1981,
+  1999,
+  2017,
+  2035,
+  2053,
+  2071,
+  2089,
+  2107,
+  2125,
+  2143,
+  2161,
+  2179,
+  2197,
+  2215,
+  2233,
+  2251,
+  2269,
+  2287,
+  2305,
+  2323,
+  2341,
+  2359,
+  2377,
+  2395,
+  2413,
+  2431,
+  2449,
+  2467,
+  2485,
+  2503,
+  2521,
+  2539,
+  2557,
+  2575,
+  2593,
+  2611,
+  2629,
+  2647,
+  2665,
+  2683,
+  2701,
+  2719,
+  2737,
+  2755,
+  2773,
+  2791,
+  2809,
+  2827,
+  2845,
+  2863,
+  2881,
+  2899,
+  2917,
+  2935,
+  2953,
+  2971,
+  2989,
+  3007,
+  3025,
+  3043,
+  3061,
+  3079,
+  3097,
+  3115,
+  3133,
+  3151,
+  3169,
+  3187,
+  3205,
+  3223,
+  3241,
+  3259,
+  3277,
+  3295,
+  3313,
+  3331,
+  3349,
+  3367,
+  3385,
+  3403,
+  3421,
+  3439,
+  3457,
+  3475,
+  3493,
+  3511,
+  3529,
+  3547,
+  3565,
+  3583,
+  3601,
+  3619,
+  3637,
+  3655,
+  3673,
+  3691,
+  3709,
+  3727,
+  3745,
+  3763,
+  3781,
+  3799,
+  3817,
+  3835,
+  3853,
+  3871,
+  3889,
+  3907,
+  3925,
+  3943,
+  3961,
+  3979,
+  3997,
+  4015,
+  4033,
+  4051,
+  4069,
+  4087,
+  4105,
+  4123,
+  4141,
+  4159,
+  4177,
+  4195,
+  4213,
+  4231,
+  4249,
+  4267,
+  4285,
+  4303,
+  4321,
+  4339,
+  4357,
+  4375,
+  4393,
+  4411,
+  4429,
+  4447,
+  4465,
+  4483,
+  4501,
+  4519,
+  4537,
+  4555,
+  4573,
+  4591,
+  4609,
+  4627,
+  4645,
+  4663,
+  4681,
+  4699,
+  4717,
+  4735,
+  4753,
+  4771,
+  4789,
+  4807,
+  4825,
+  4843,
+  4861,
+  4879,
+  4897,
+  4915,
+  4933,
+  4951,
+  4969,
+  4987,
+  5005,
+  5023,
+  5041
+ ],
+ "music": {
+  "file": "audio/music.mp3",
+  "source": "elevenlabs-music"
+ },
+ "scenes": [
+  {
+   "id": "open",
+   "from": 0,
+   "durationInFrames": 271,
+   "lines": [
+    {
+     "voice": "narrator",
+     "text": "One line in a team chat. Approve, promote. Typed by a person, it is the only way this fix reaches production.",
+     "file": "audio/vo/open_0.mp3",
+     "startFrame": 12,
+     "durationFrames": 236,
+     "estimated": false,
+     "words": [
+      {
+       "word": "One",
+       "start": 12,
+       "end": 18
+      },
+      {
+       "word": "line",
+       "start": 19,
+       "end": 27
+      },
+      {
+       "word": "in",
+       "start": 28,
+       "end": 29
+      },
+      {
+       "word": "a",
+       "start": 31,
+       "end": 32
+      },
+      {
+       "word": "team",
+       "start": 33,
+       "end": 39
+      },
+      {
+       "word": "chat.",
+       "start": 41,
+       "end": 56
+      },
+      {
+       "word": "Approve,",
+       "start": 69,
+       "end": 90
+      },
+      {
+       "word": "promote.",
+       "start": 94,
+       "end": 112
+      },
+      {
+       "word": "Typed",
+       "start": 126,
+       "end": 138
+      },
+      {
+       "word": "by",
+       "start": 139,
+       "end": 143
+      },
+      {
+       "word": "a",
+       "start": 145,
+       "end": 145
+      },
+      {
+       "word": "person,",
+       "start": 147,
+       "end": 164
+      },
+      {
+       "word": "it",
+       "start": 168,
+       "end": 171
+      },
+      {
+       "word": "is",
+       "start": 172,
+       "end": 175
+      },
+      {
+       "word": "the",
+       "start": 176,
+       "end": 178
+      },
+      {
+       "word": "only",
+       "start": 181,
+       "end": 187
+      },
+      {
+       "word": "way",
+       "start": 189,
+       "end": 194
+      },
+      {
+       "word": "this",
+       "start": 196,
+       "end": 200
+      },
+      {
+       "word": "fix",
+       "start": 203,
+       "end": 209
+      },
+      {
+       "word": "reaches",
+       "start": 212,
+       "end": 220
+      },
+      {
+       "word": "production.",
+       "start": 221,
+       "end": 247
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "problem",
+   "from": 271,
+   "durationInFrames": 510,
+   "lines": [
+    {
+     "voice": "narrator",
+     "text": "Teams already let coding agents fix bugs. But in an outage, the agent sits in one engineer's terminal. Nobody else sees what it found. Two people can stage two different fixes. And an agent that holds the deploy keys can ship its own change.",
+     "file": "audio/vo/problem_0.mp3",
+     "startFrame": 283,
+     "durationFrames": 481,
+     "estimated": false,
+     "words": [
+      {
+       "word": "Teams",
+       "start": 283,
+       "end": 295
+      },
+      {
+       "word": "already",
+       "start": 297,
+       "end": 307
+      },
+      {
+       "word": "let",
+       "start": 308,
+       "end": 313
+      },
+      {
+       "word": "coding",
+       "start": 314,
+       "end": 323
+      },
+      {
+       "word": "agents",
+       "start": 325,
+       "end": 334
+      },
+      {
+       "word": "fix",
+       "start": 336,
+       "end": 342
+      },
+      {
+       "word": "bugs.",
+       "start": 345,
+       "end": 361
+      },
+      {
+       "word": "But",
+       "start": 375,
+       "end": 379
+      },
+      {
+       "word": "in",
+       "start": 381,
+       "end": 384
+      },
+      {
+       "word": "an",
+       "start": 385,
+       "end": 387
+      },
+      {
+       "word": "outage,",
+       "start": 389,
+       "end": 404
+      },
+      {
+       "word": "the",
+       "start": 408,
+       "end": 411
+      },
+      {
+       "word": "agent",
+       "start": 413,
+       "end": 422
+      },
+      {
+       "word": "sits",
+       "start": 423,
+       "end": 430
+      },
+      {
+       "word": "in",
+       "start": 431,
+       "end": 433
+      },
+      {
+       "word": "one",
+       "start": 436,
+       "end": 441
+      },
+      {
+       "word": "engineer's",
+       "start": 443,
+       "end": 456
+      },
+      {
+       "word": "terminal.",
+       "start": 458,
+       "end": 477
+      },
+      {
+       "word": "Nobody",
+       "start": 495,
+       "end": 507
+      },
+      {
+       "word": "else",
+       "start": 509,
+       "end": 516
+      },
+      {
+       "word": "sees",
+       "start": 517,
+       "end": 523
+      },
+      {
+       "word": "what",
+       "start": 524,
+       "end": 528
+      },
+      {
+       "word": "it",
+       "start": 529,
+       "end": 530
+      },
+      {
+       "word": "found.",
+       "start": 532,
+       "end": 548
+      },
+      {
+       "word": "Two",
+       "start": 566,
+       "end": 572
+      },
+      {
+       "word": "people",
+       "start": 574,
+       "end": 583
+      },
+      {
+       "word": "can",
+       "start": 584,
+       "end": 587
+      },
+      {
+       "word": "stage",
+       "start": 589,
+       "end": 599
+      },
+      {
+       "word": "two",
+       "start": 601,
+       "end": 606
+      },
+      {
+       "word": "different",
+       "start": 608,
+       "end": 616
+      },
+      {
+       "word": "fixes.",
+       "start": 617,
+       "end": 637
+      },
+      {
+       "word": "And",
+       "start": 650,
+       "end": 655
+      },
+      {
+       "word": "an",
+       "start": 656,
+       "end": 658
+      },
+      {
+       "word": "agent",
+       "start": 660,
+       "end": 669
+      },
+      {
+       "word": "that",
+       "start": 670,
+       "end": 674
+      },
+      {
+       "word": "holds",
+       "start": 676,
+       "end": 683
+      },
+      {
+       "word": "the",
+       "start": 684,
+       "end": 686
+      },
+      {
+       "word": "deploy",
+       "start": 687,
+       "end": 696
+      },
+      {
+       "word": "keys",
+       "start": 697,
+       "end": 707
+      },
+      {
+       "word": "can",
+       "start": 711,
+       "end": 716
+      },
+      {
+       "word": "ship",
+       "start": 717,
+       "end": 724
+      },
+      {
+       "word": "its",
+       "start": 727,
+       "end": 731
+      },
+      {
+       "word": "own",
+       "start": 733,
+       "end": 738
+      },
+      {
+       "word": "change.",
+       "start": 740,
+       "end": 764
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "gap",
+   "from": 781,
+   "durationInFrames": 180,
+   "lines": [
+    {
+     "voice": "narrator",
+     "text": "What's missing is not a smarter model. It's a room with rules.",
+     "file": "audio/vo/gap_0.mp3",
+     "startFrame": 793,
+     "durationFrames": 108,
+     "estimated": false,
+     "words": [
+      {
+       "word": "What's",
+       "start": 793,
+       "end": 801
+      },
+      {
+       "word": "missing",
+       "start": 802,
+       "end": 813
+      },
+      {
+       "word": "is",
+       "start": 815,
+       "end": 820
+      },
+      {
+       "word": "not",
+       "start": 822,
+       "end": 826
+      },
+      {
+       "word": "a",
+       "start": 827,
+       "end": 828
+      },
+      {
+       "word": "smarter",
+       "start": 829,
+       "end": 839
+      },
+      {
+       "word": "model.",
+       "start": 840,
+       "end": 853
+      },
+      {
+       "word": "It's",
+       "start": 859,
+       "end": 864
+      },
+      {
+       "word": "a",
+       "start": 865,
+       "end": 866
+      },
+      {
+       "word": "room",
+       "start": 868,
+       "end": 873
+      },
+      {
+       "word": "with",
+       "start": 874,
+       "end": 878
+      },
+      {
+       "word": "rules.",
+       "start": 879,
+       "end": 900
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "turn",
+   "from": 961,
+   "durationInFrames": 240,
+   "lines": [
+    {
+     "voice": "narrator",
+     "text": "Meet Vigil. Claude Code fixes the outage. A person ships it. Built on Switch.",
+     "file": "audio/vo/turn_0.mp3",
+     "startFrame": 973,
+     "durationFrames": 162,
+     "estimated": false,
+     "words": [
+      {
+       "word": "Meet",
+       "start": 973,
+       "end": 981
+      },
+      {
+       "word": "Vigil.",
+       "start": 983,
+       "end": 999
+      },
+      {
+       "word": "Claude",
+       "start": 1004,
+       "end": 1014
+      },
+      {
+       "word": "Code",
+       "start": 1015,
+       "end": 1023
+      },
+      {
+       "word": "fixes",
+       "start": 1025,
+       "end": 1035
+      },
+      {
+       "word": "the",
+       "start": 1036,
+       "end": 1038
+      },
+      {
+       "word": "outage.",
+       "start": 1040,
+       "end": 1055
+      },
+      {
+       "word": "A",
+       "start": 1063,
+       "end": 1065
+      },
+      {
+       "word": "person",
+       "start": 1068,
+       "end": 1077
+      },
+      {
+       "word": "ships",
+       "start": 1079,
+       "end": 1087
+      },
+      {
+       "word": "it.",
+       "start": 1089,
+       "end": 1095
+      },
+      {
+       "word": "Built",
+       "start": 1100,
+       "end": 1107
+      },
+      {
+       "word": "on",
+       "start": 1109,
+       "end": 1111
+      },
+      {
+       "word": "Switch.",
+       "start": 1113,
+       "end": 1135
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "break",
+   "from": 1201,
+   "durationInFrames": 510,
+   "lines": [
+    {
+     "voice": "narrator",
+     "text": "This is a real run on our live server. A bad release breaks checkout. The sentinel agent takes the incident commander role in Switch, so exactly one agent is in charge, and writes what it found into a room document.",
+     "file": "audio/vo/break_0.mp3",
+     "startFrame": 1213,
+     "durationFrames": 409,
+     "estimated": false,
+     "words": [
+      {
+       "word": "This",
+       "start": 1213,
+       "end": 1219
+      },
+      {
+       "word": "is",
+       "start": 1221,
+       "end": 1223
+      },
+      {
+       "word": "a",
+       "start": 1225,
+       "end": 1226
+      },
+      {
+       "word": "real",
+       "start": 1229,
+       "end": 1235
+      },
+      {
+       "word": "run",
+       "start": 1238,
+       "end": 1245
+      },
+      {
+       "word": "on",
+       "start": 1247,
+       "end": 1250
+      },
+      {
+       "word": "our",
+       "start": 1251,
+       "end": 1253
+      },
+      {
+       "word": "live",
+       "start": 1255,
+       "end": 1261
+      },
+      {
+       "word": "server.",
+       "start": 1262,
+       "end": 1279
+      },
+      {
+       "word": "A",
+       "start": 1290,
+       "end": 1293
+      },
+      {
+       "word": "bad",
+       "start": 1295,
+       "end": 1301
+      },
+      {
+       "word": "release",
+       "start": 1304,
+       "end": 1315
+      },
+      {
+       "word": "breaks",
+       "start": 1316,
+       "end": 1326
+      },
+      {
+       "word": "checkout.",
+       "start": 1327,
+       "end": 1346
+      },
+      {
+       "word": "The",
+       "start": 1362,
+       "end": 1365
+      },
+      {
+       "word": "sentinel",
+       "start": 1367,
+       "end": 1380
+      },
+      {
+       "word": "agent",
+       "start": 1382,
+       "end": 1393
+      },
+      {
+       "word": "takes",
+       "start": 1395,
+       "end": 1404
+      },
+      {
+       "word": "the",
+       "start": 1405,
+       "end": 1407
+      },
+      {
+       "word": "incident",
+       "start": 1409,
+       "end": 1420
+      },
+      {
+       "word": "commander",
+       "start": 1422,
+       "end": 1432
+      },
+      {
+       "word": "role",
+       "start": 1433,
+       "end": 1440
+      },
+      {
+       "word": "in",
+       "start": 1440,
+       "end": 1443
+      },
+      {
+       "word": "Switch,",
+       "start": 1445,
+       "end": 1461
+      },
+      {
+       "word": "so",
+       "start": 1469,
+       "end": 1473
+      },
+      {
+       "word": "exactly",
+       "start": 1475,
+       "end": 1489
+      },
+      {
+       "word": "one",
+       "start": 1492,
+       "end": 1498
+      },
+      {
+       "word": "agent",
+       "start": 1500,
+       "end": 1508
+      },
+      {
+       "word": "is",
+       "start": 1510,
+       "end": 1512
+      },
+      {
+       "word": "in",
+       "start": 1514,
+       "end": 1516
+      },
+      {
+       "word": "charge,",
+       "start": 1517,
+       "end": 1534
+      },
+      {
+       "word": "and",
+       "start": 1544,
+       "end": 1549
+      },
+      {
+       "word": "writes",
+       "start": 1550,
+       "end": 1558
+      },
+      {
+       "word": "what",
+       "start": 1559,
+       "end": 1563
+      },
+      {
+       "word": "it",
+       "start": 1564,
+       "end": 1566
+      },
+      {
+       "word": "found",
+       "start": 1568,
+       "end": 1577
+      },
+      {
+       "word": "into",
+       "start": 1579,
+       "end": 1584
+      },
+      {
+       "word": "a",
+       "start": 1587,
+       "end": 1587
+      },
+      {
+       "word": "room",
+       "start": 1590,
+       "end": 1595
+      },
+      {
+       "word": "document.",
+       "start": 1597,
+       "end": 1621
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "chat",
+   "from": 1711,
+   "durationInFrames": 660,
+   "lines": [
+    {
+     "voice": "narrator",
+     "text": "Then it hands the failing request to Claude Code, in the hotfix room, in Mattermost. Claude Code reproduces the error on the live service, recognizes it from an earlier incident, writes the fix and asks for a check. The whole team sees it happen in the same chat.",
+     "file": "audio/vo/chat_0.mp3",
+     "startFrame": 1723,
+     "durationFrames": 545,
+     "estimated": false,
+     "words": [
+      {
+       "word": "Then",
+       "start": 1723,
+       "end": 1733
+      },
+      {
+       "word": "it",
+       "start": 1737,
+       "end": 1742
+      },
+      {
+       "word": "hands",
+       "start": 1743,
+       "end": 1751
+      },
+      {
+       "word": "the",
+       "start": 1753,
+       "end": 1755
+      },
+      {
+       "word": "failing",
+       "start": 1756,
+       "end": 1765
+      },
+      {
+       "word": "request",
+       "start": 1767,
+       "end": 1782
+      },
+      {
+       "word": "to",
+       "start": 1785,
+       "end": 1789
+      },
+      {
+       "word": "Claude",
+       "start": 1791,
+       "end": 1800
+      },
+      {
+       "word": "Code,",
+       "start": 1801,
+       "end": 1818
+      },
+      {
+       "word": "in",
+       "start": 1826,
+       "end": 1829
+      },
+      {
+       "word": "the",
+       "start": 1830,
+       "end": 1832
+      },
+      {
+       "word": "hotfix",
+       "start": 1834,
+       "end": 1846
+      },
+      {
+       "word": "room,",
+       "start": 1848,
+       "end": 1860
+      },
+      {
+       "word": "in",
+       "start": 1867,
+       "end": 1871
+      },
+      {
+       "word": "Mattermost.",
+       "start": 1873,
+       "end": 1897
+      },
+      {
+       "word": "Claude",
+       "start": 1931,
+       "end": 1941
+      },
+      {
+       "word": "Code",
+       "start": 1942,
+       "end": 1952
+      },
+      {
+       "word": "reproduces",
+       "start": 1954,
+       "end": 1973
+      },
+      {
+       "word": "the",
+       "start": 1974,
+       "end": 1977
+      },
+      {
+       "word": "error",
+       "start": 1979,
+       "end": 1987
+      },
+      {
+       "word": "on",
+       "start": 1989,
+       "end": 1992
+      },
+      {
+       "word": "the",
+       "start": 1993,
+       "end": 1995
+      },
+      {
+       "word": "live",
+       "start": 1997,
+       "end": 2004
+      },
+      {
+       "word": "service,",
+       "start": 2005,
+       "end": 2023
+      },
+      {
+       "word": "recognizes",
+       "start": 2035,
+       "end": 2052
+      },
+      {
+       "word": "it",
+       "start": 2054,
+       "end": 2057
+      },
+      {
+       "word": "from",
+       "start": 2059,
+       "end": 2063
+      },
+      {
+       "word": "an",
+       "start": 2065,
+       "end": 2066
+      },
+      {
+       "word": "earlier",
+       "start": 2069,
+       "end": 2079
+      },
+      {
+       "word": "incident,",
+       "start": 2081,
+       "end": 2100
+      },
+      {
+       "word": "writes",
+       "start": 2106,
+       "end": 2116
+      },
+      {
+       "word": "the",
+       "start": 2117,
+       "end": 2119
+      },
+      {
+       "word": "fix",
+       "start": 2121,
+       "end": 2130
+      },
+      {
+       "word": "and",
+       "start": 2134,
+       "end": 2139
+      },
+      {
+       "word": "asks",
+       "start": 2141,
+       "end": 2151
+      },
+      {
+       "word": "for",
+       "start": 2152,
+       "end": 2156
+      },
+      {
+       "word": "a",
+       "start": 2158,
+       "end": 2158
+      },
+      {
+       "word": "check.",
+       "start": 2160,
+       "end": 2175
+      },
+      {
+       "word": "The",
+       "start": 2188,
+       "end": 2191
+      },
+      {
+       "word": "whole",
+       "start": 2193,
+       "end": 2199
+      },
+      {
+       "word": "team",
+       "start": 2201,
+       "end": 2209
+      },
+      {
+       "word": "sees",
+       "start": 2211,
+       "end": 2216
+      },
+      {
+       "word": "it",
+       "start": 2217,
+       "end": 2219
+      },
+      {
+       "word": "happen",
+       "start": 2220,
+       "end": 2229
+      },
+      {
+       "word": "in",
+       "start": 2231,
+       "end": 2233
+      },
+      {
+       "word": "the",
+       "start": 2234,
+       "end": 2236
+      },
+      {
+       "word": "same",
+       "start": 2237,
+       "end": 2245
+      },
+      {
+       "word": "chat.",
+       "start": 2246,
+       "end": 2268
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "verify",
+   "from": 2371,
+   "durationInFrames": 457,
+   "lines": [
+    {
+     "voice": "narrator",
+     "text": "Vigil's patcher does not take its word for it. It runs the service's real tests and replays the failing request on a staging copy. Seven of seven checks pass. A fix that does not work never reaches the release room.",
+     "file": "audio/vo/verify_0.mp3",
+     "startFrame": 2383,
+     "durationFrames": 430,
+     "estimated": false,
+     "words": [
+      {
+       "word": "Vigil's",
+       "start": 2383,
+       "end": 2397
+      },
+      {
+       "word": "patcher",
+       "start": 2398,
+       "end": 2411
+      },
+      {
+       "word": "does",
+       "start": 2414,
+       "end": 2420
+      },
+      {
+       "word": "not",
+       "start": 2422,
+       "end": 2427
+      },
+      {
+       "word": "take",
+       "start": 2429,
+       "end": 2435
+      },
+      {
+       "word": "its",
+       "start": 2436,
+       "end": 2439
+      },
+      {
+       "word": "word",
+       "start": 2440,
+       "end": 2446
+      },
+      {
+       "word": "for",
+       "start": 2447,
+       "end": 2451
+      },
+      {
+       "word": "it.",
+       "start": 2453,
+       "end": 2459
+      },
+      {
+       "word": "It",
+       "start": 2475,
+       "end": 2479
+      },
+      {
+       "word": "runs",
+       "start": 2481,
+       "end": 2487
+      },
+      {
+       "word": "the",
+       "start": 2489,
+       "end": 2491
+      },
+      {
+       "word": "service's",
+       "start": 2492,
+       "end": 2506
+      },
+      {
+       "word": "real",
+       "start": 2509,
+       "end": 2516
+      },
+      {
+       "word": "tests",
+       "start": 2517,
+       "end": 2530
+      },
+      {
+       "word": "and",
+       "start": 2537,
+       "end": 2542
+      },
+      {
+       "word": "replays",
+       "start": 2544,
+       "end": 2557
+      },
+      {
+       "word": "the",
+       "start": 2559,
+       "end": 2561
+      },
+      {
+       "word": "failing",
+       "start": 2563,
+       "end": 2572
+      },
+      {
+       "word": "request",
+       "start": 2574,
+       "end": 2587
+      },
+      {
+       "word": "on",
+       "start": 2590,
+       "end": 2593
+      },
+      {
+       "word": "a",
+       "start": 2594,
+       "end": 2595
+      },
+      {
+       "word": "staging",
+       "start": 2597,
+       "end": 2607
+      },
+      {
+       "word": "copy.",
+       "start": 2609,
+       "end": 2624
+      },
+      {
+       "word": "Seven",
+       "start": 2648,
+       "end": 2658
+      },
+      {
+       "word": "of",
+       "start": 2660,
+       "end": 2662
+      },
+      {
+       "word": "seven",
+       "start": 2664,
+       "end": 2672
+      },
+      {
+       "word": "checks",
+       "start": 2673,
+       "end": 2682
+      },
+      {
+       "word": "pass.",
+       "start": 2683,
+       "end": 2700
+      },
+      {
+       "word": "A",
+       "start": 2711,
+       "end": 2714
+      },
+      {
+       "word": "fix",
+       "start": 2717,
+       "end": 2724
+      },
+      {
+       "word": "that",
+       "start": 2726,
+       "end": 2730
+      },
+      {
+       "word": "does",
+       "start": 2731,
+       "end": 2735
+      },
+      {
+       "word": "not",
+       "start": 2737,
+       "end": 2741
+      },
+      {
+       "word": "work",
+       "start": 2743,
+       "end": 2750
+      },
+      {
+       "word": "never",
+       "start": 2758,
+       "end": 2766
+      },
+      {
+       "word": "reaches",
+       "start": 2768,
+       "end": 2778
+      },
+      {
+       "word": "the",
+       "start": 2779,
+       "end": 2781
+      },
+      {
+       "word": "release",
+       "start": 2783,
+       "end": 2793
+      },
+      {
+       "word": "room.",
+       "start": 2794,
+       "end": 2812
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "rogue",
+   "from": 2828,
+   "durationInFrames": 360,
+   "lines": [
+    {
+     "voice": "narrator",
+     "text": "Now an agent tries to approve its own release. The gate is plain code, not a model. It sees an agent, and it refuses.",
+     "file": "audio/vo/rogue_0.mp3",
+     "startFrame": 2840,
+     "durationFrames": 260,
+     "estimated": false,
+     "words": [
+      {
+       "word": "Now",
+       "start": 2840,
+       "end": 2849
+      },
+      {
+       "word": "an",
+       "start": 2854,
+       "end": 2858
+      },
+      {
+       "word": "agent",
+       "start": 2861,
+       "end": 2870
+      },
+      {
+       "word": "tries",
+       "start": 2871,
+       "end": 2879
+      },
+      {
+       "word": "to",
+       "start": 2881,
+       "end": 2882
+      },
+      {
+       "word": "approve",
+       "start": 2884,
+       "end": 2893
+      },
+      {
+       "word": "its",
+       "start": 2894,
+       "end": 2897
+      },
+      {
+       "word": "own",
+       "start": 2899,
+       "end": 2903
+      },
+      {
+       "word": "release.",
+       "start": 2905,
+       "end": 2921
+      },
+      {
+       "word": "The",
+       "start": 2935,
+       "end": 2938
+      },
+      {
+       "word": "gate",
+       "start": 2940,
+       "end": 2948
+      },
+      {
+       "word": "is",
+       "start": 2949,
+       "end": 2953
+      },
+      {
+       "word": "plain",
+       "start": 2955,
+       "end": 2963
+      },
+      {
+       "word": "code,",
+       "start": 2965,
+       "end": 2980
+      },
+      {
+       "word": "not",
+       "start": 2987,
+       "end": 2993
+      },
+      {
+       "word": "a",
+       "start": 2994,
+       "end": 2995
+      },
+      {
+       "word": "model.",
+       "start": 2996,
+       "end": 3010
+      },
+      {
+       "word": "It",
+       "start": 3024,
+       "end": 3028
+      },
+      {
+       "word": "sees",
+       "start": 3030,
+       "end": 3037
+      },
+      {
+       "word": "an",
+       "start": 3038,
+       "end": 3040
+      },
+      {
+       "word": "agent,",
+       "start": 3042,
+       "end": 3057
+      },
+      {
+       "word": "and",
+       "start": 3059,
+       "end": 3064
+      },
+      {
+       "word": "it",
+       "start": 3065,
+       "end": 3067
+      },
+      {
+       "word": "refuses.",
+       "start": 3068,
+       "end": 3099
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "ship",
+   "from": 3188,
+   "durationInFrames": 540,
+   "lines": [
+    {
+     "voice": "narrator",
+     "text": "Only a person can ship. One message in Mattermost. The gate deploys the verified commit, all five canary probes answer, and the postmortem is written. Seventy-seven seconds, alert to closed.",
+     "file": "audio/vo/ship_0.mp3",
+     "startFrame": 3200,
+     "durationFrames": 388,
+     "estimated": false,
+     "words": [
+      {
+       "word": "Only",
+       "start": 3200,
+       "end": 3209
+      },
+      {
+       "word": "a",
+       "start": 3210,
+       "end": 3211
+      },
+      {
+       "word": "person",
+       "start": 3213,
+       "end": 3222
+      },
+      {
+       "word": "can",
+       "start": 3224,
+       "end": 3227
+      },
+      {
+       "word": "ship.",
+       "start": 3229,
+       "end": 3241
+      },
+      {
+       "word": "One",
+       "start": 3262,
+       "end": 3269
+      },
+      {
+       "word": "message",
+       "start": 3271,
+       "end": 3283
+      },
+      {
+       "word": "in",
+       "start": 3285,
+       "end": 3288
+      },
+      {
+       "word": "Mattermost.",
+       "start": 3290,
+       "end": 3312
+      },
+      {
+       "word": "The",
+       "start": 3325,
+       "end": 3329
+      },
+      {
+       "word": "gate",
+       "start": 3330,
+       "end": 3337
+      },
+      {
+       "word": "deploys",
+       "start": 3338,
+       "end": 3350
+      },
+      {
+       "word": "the",
+       "start": 3351,
+       "end": 3353
+      },
+      {
+       "word": "verified",
+       "start": 3354,
+       "end": 3367
+      },
+      {
+       "word": "commit,",
+       "start": 3368,
+       "end": 3383
+      },
+      {
+       "word": "all",
+       "start": 3387,
+       "end": 3393
+      },
+      {
+       "word": "five",
+       "start": 3395,
+       "end": 3404
+      },
+      {
+       "word": "canary",
+       "start": 3406,
+       "end": 3415
+      },
+      {
+       "word": "probes",
+       "start": 3417,
+       "end": 3425
+      },
+      {
+       "word": "answer,",
+       "start": 3426,
+       "end": 3442
+      },
+      {
+       "word": "and",
+       "start": 3446,
+       "end": 3450
+      },
+      {
+       "word": "the",
+       "start": 3452,
+       "end": 3454
+      },
+      {
+       "word": "postmortem",
+       "start": 3455,
+       "end": 3472
+      },
+      {
+       "word": "is",
+       "start": 3474,
+       "end": 3476
+      },
+      {
+       "word": "written.",
+       "start": 3477,
+       "end": 3490
+      },
+      {
+       "word": "Seventy-seven",
+       "start": 3508,
+       "end": 3530
+      },
+      {
+       "word": "seconds,",
+       "start": 3532,
+       "end": 3549
+      },
+      {
+       "word": "alert",
+       "start": 3551,
+       "end": 3560
+      },
+      {
+       "word": "to",
+       "start": 3562,
+       "end": 3563
+      },
+      {
+       "word": "closed.",
+       "start": 3565,
+       "end": 3587
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "switch",
+   "from": 3728,
+   "durationInFrames": 630,
+   "lines": [
+    {
+     "voice": "narrator",
+     "text": "Switch holds this together. Three linked rooms carry the incident from triage, to the fix, to the release. Exclusive roles mean one commander and one patch author. Room documents keep the dossier, the test report and the release policy.",
+     "file": "audio/vo/switch_0.mp3",
+     "startFrame": 3740,
+     "durationFrames": 496,
+     "estimated": false,
+     "words": [
+      {
+       "word": "Switch",
+       "start": 3740,
+       "end": 3751
+      },
+      {
+       "word": "holds",
+       "start": 3753,
+       "end": 3761
+      },
+      {
+       "word": "this",
+       "start": 3762,
+       "end": 3766
+      },
+      {
+       "word": "together.",
+       "start": 3768,
+       "end": 3785
+      },
+      {
+       "word": "Three",
+       "start": 3801,
+       "end": 3810
+      },
+      {
+       "word": "linked",
+       "start": 3812,
+       "end": 3820
+      },
+      {
+       "word": "rooms",
+       "start": 3821,
+       "end": 3833
+      },
+      {
+       "word": "carry",
+       "start": 3836,
+       "end": 3845
+      },
+      {
+       "word": "the",
+       "start": 3847,
+       "end": 3849
+      },
+      {
+       "word": "incident",
+       "start": 3850,
+       "end": 3863
+      },
+      {
+       "word": "from",
+       "start": 3865,
+       "end": 3870
+      },
+      {
+       "word": "triage,",
+       "start": 3872,
+       "end": 3893
+      },
+      {
+       "word": "to",
+       "start": 3896,
+       "end": 3900
+      },
+      {
+       "word": "the",
+       "start": 3902,
+       "end": 3904
+      },
+      {
+       "word": "fix,",
+       "start": 3905,
+       "end": 3921
+      },
+      {
+       "word": "to",
+       "start": 3927,
+       "end": 3930
+      },
+      {
+       "word": "the",
+       "start": 3932,
+       "end": 3934
+      },
+      {
+       "word": "release.",
+       "start": 3936,
+       "end": 3954
+      },
+      {
+       "word": "Exclusive",
+       "start": 3972,
+       "end": 3990
+      },
+      {
+       "word": "roles",
+       "start": 3991,
+       "end": 4001
+      },
+      {
+       "word": "mean",
+       "start": 4004,
+       "end": 4011
+      },
+      {
+       "word": "one",
+       "start": 4013,
+       "end": 4019
+      },
+      {
+       "word": "commander",
+       "start": 4020,
+       "end": 4035
+      },
+      {
+       "word": "and",
+       "start": 4037,
+       "end": 4042
+      },
+      {
+       "word": "one",
+       "start": 4044,
+       "end": 4050
+      },
+      {
+       "word": "patch",
+       "start": 4051,
+       "end": 4060
+      },
+      {
+       "word": "author.",
+       "start": 4062,
+       "end": 4076
+      },
+      {
+       "word": "Room",
+       "start": 4094,
+       "end": 4101
+      },
+      {
+       "word": "documents",
+       "start": 4103,
+       "end": 4118
+      },
+      {
+       "word": "keep",
+       "start": 4120,
+       "end": 4127
+      },
+      {
+       "word": "the",
+       "start": 4128,
+       "end": 4130
+      },
+      {
+       "word": "dossier,",
+       "start": 4131,
+       "end": 4152
+      },
+      {
+       "word": "the",
+       "start": 4158,
+       "end": 4161
+      },
+      {
+       "word": "test",
+       "start": 4163,
+       "end": 4170
+      },
+      {
+       "word": "report",
+       "start": 4171,
+       "end": 4184
+      },
+      {
+       "word": "and",
+       "start": 4188,
+       "end": 4195
+      },
+      {
+       "word": "the",
+       "start": 4196,
+       "end": 4198
+      },
+      {
+       "word": "release",
+       "start": 4200,
+       "end": 4210
+      },
+      {
+       "word": "policy.",
+       "start": 4211,
+       "end": 4236
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "unique",
+   "from": 4358,
+   "durationInFrames": 390,
+   "lines": [
+    {
+     "voice": "narrator",
+     "text": "So the agent you already use becomes a teammate. It writes the fix. Another agent checks it. And the keys to production stay with people.",
+     "file": "audio/vo/unique_0.mp3",
+     "startFrame": 4370,
+     "durationFrames": 260,
+     "estimated": false,
+     "words": [
+      {
+       "word": "So",
+       "start": 4370,
+       "end": 4375
+      },
+      {
+       "word": "the",
+       "start": 4377,
+       "end": 4379
+      },
+      {
+       "word": "agent",
+       "start": 4381,
+       "end": 4390
+      },
+      {
+       "word": "you",
+       "start": 4391,
+       "end": 4393
+      },
+      {
+       "word": "already",
+       "start": 4395,
+       "end": 4403
+      },
+      {
+       "word": "use",
+       "start": 4406,
+       "end": 4418
+      },
+      {
+       "word": "becomes",
+       "start": 4420,
+       "end": 4430
+      },
+      {
+       "word": "a",
+       "start": 4431,
+       "end": 4432
+      },
+      {
+       "word": "teammate.",
+       "start": 4433,
+       "end": 4451
+      },
+      {
+       "word": "It",
+       "start": 4461,
+       "end": 4465
+      },
+      {
+       "word": "writes",
+       "start": 4465,
+       "end": 4473
+      },
+      {
+       "word": "the",
+       "start": 4475,
+       "end": 4477
+      },
+      {
+       "word": "fix.",
+       "start": 4478,
+       "end": 4494
+      },
+      {
+       "word": "Another",
+       "start": 4507,
+       "end": 4518
+      },
+      {
+       "word": "agent",
+       "start": 4520,
+       "end": 4528
+      },
+      {
+       "word": "checks",
+       "start": 4529,
+       "end": 4538
+      },
+      {
+       "word": "it.",
+       "start": 4540,
+       "end": 4547
+      },
+      {
+       "word": "And",
+       "start": 4558,
+       "end": 4563
+      },
+      {
+       "word": "the",
+       "start": 4564,
+       "end": 4566
+      },
+      {
+       "word": "keys",
+       "start": 4567,
+       "end": 4574
+      },
+      {
+       "word": "to",
+       "start": 4576,
+       "end": 4578
+      },
+      {
+       "word": "production",
+       "start": 4579,
+       "end": 4594
+      },
+      {
+       "word": "stay",
+       "start": 4597,
+       "end": 4603
+      },
+      {
+       "word": "with",
+       "start": 4604,
+       "end": 4608
+      },
+      {
+       "word": "people.",
+       "start": 4609,
+       "end": 4629
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "close",
+   "from": 4748,
+   "durationInFrames": 300,
+   "lines": [
+    {
+     "voice": "narrator",
+     "text": "Vigil. Built on Switch. Live at vigil dot netlayerlabs dot com.",
+     "file": "audio/vo/close_0.mp3",
+     "startFrame": 4760,
+     "durationFrames": 152,
+     "estimated": false,
+     "words": [
+      {
+       "word": "Vigil.",
+       "start": 4760,
+       "end": 4778
+      },
+      {
+       "word": "Built",
+       "start": 4788,
+       "end": 4795
+      },
+      {
+       "word": "on",
+       "start": 4797,
+       "end": 4799
+      },
+      {
+       "word": "Switch.",
+       "start": 4802,
+       "end": 4817
+      },
+      {
+       "word": "Live",
+       "start": 4826,
+       "end": 4834
+      },
+      {
+       "word": "at",
+       "start": 4835,
+       "end": 4836
+      },
+      {
+       "word": "vigil",
+       "start": 4838,
+       "end": 4846
+      },
+      {
+       "word": "dot",
+       "start": 4848,
+       "end": 4854
+      },
+      {
+       "word": "net",
+       "start": 4857,
+       "end": 4862
+      },
+      {
+       "word": "layer",
+       "start": 4863,
+       "end": 4870
+      },
+      {
+       "word": "labs",
+       "start": 4871,
+       "end": 4880
+      },
+      {
+       "word": "dot",
+       "start": 4882,
+       "end": 4888
+      },
+      {
+       "word": "com.",
+       "start": 4890,
+       "end": 4912
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}
