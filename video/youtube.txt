@@ -1,5 +1,5 @@
 TITLE
-Vigil: Claude Code fixes a live outage in Mattermost, and only a person can ship it (built on Switch)
+Vigil: Claude Code fixes a live outage in Mattermost. Only a person can ship it. Built on Switch
 
 DESCRIPTION
 Vigil runs a production incident across three linked Switch rooms. A sentinel agent takes command, Claude Code writes the fix in the team's Mattermost, another agent checks it with the real tests and a staging replay, and a release gate made of plain code refuses every agent. Only a person typing "approve" in chat can ship.
@@ -8,6 +8,7 @@ Everything in this film is real: INC-2046 on the live deployment on Nov 6, 2026.
 
 Try it: https://vigil.netlayerlabs.com
 Code: https://github.com/NetLayerLabs/Vigil
+On X: https://x.com/encrypt_wizard/status/2118956863207157873
 How it was built: https://medium.com/@mrnetwork/turning-a-solo-coding-agent-into-an-incident-response-teammate-with-switch-f4bcc266533f
 
 Chapters

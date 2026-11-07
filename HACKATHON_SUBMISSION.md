@@ -11,6 +11,8 @@
 - **Live app:** https://vigil.netlayerlabs.com (War Room at `/app`), running against a real Switch server (switch-core 0.31.0)
 - **Switch server:** https://vigil-switch.netlayerlabs.com · **Mattermost:** https://vigil-chat.netlayerlabs.com
 - **Code:** https://github.com/NetLayerLabs/Vigil
+- **Demo video:** https://youtu.be/ap08RNmZB0g
+- **#HowISwitch post:** https://x.com/encrypt_wizard/status/2118956863207157873
 - **Blog post (Best Blog entry):** https://medium.com/@mrnetwork/turning-a-solo-coding-agent-into-an-incident-response-teammate-with-switch-f4bcc266533f
 
 ## Tagline (One Line)
