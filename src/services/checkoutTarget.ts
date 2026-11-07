@@ -84,6 +84,11 @@ export interface PatchVerificationResult {
   testRunOutput: string;
   author: string;
   source: 'vigil-patcher' | 'external-coder';
+  /**
+   * The exact production request replayed against the candidate on a staging port, so the person who
+   * approves sees a reproduced result, not the author's summary. Null when the replay did not run.
+   */
+  stagingReplay?: { httpStatus: number; chargeMinorUnits?: number; error?: string } | null;
 }
 
 export interface CanaryProbeReport {
@@ -415,11 +420,12 @@ export class LiveCheckoutTarget {
   }
 
   /** Send the manifest's endpoint request (traffic, reproduction, staging replay, canaries). */
-  private callEndpoint(baseUrl: string, body: unknown): Promise<Response> {
+  private callEndpoint(baseUrl: string, body: unknown, timeoutMs?: number): Promise<Response> {
     const { method, path: route } = TARGET.endpoint;
     const url = `${baseUrl}${route}`;
-    if (method === 'GET' || method === 'DELETE' || body === undefined) return fetch(url, { method });
-    return fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const signal = timeoutMs ? AbortSignal.timeout(timeoutMs) : undefined;
+    if (method === 'GET' || method === 'DELETE' || body === undefined) return fetch(url, { method, signal });
+    return fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal });
   }
 
   private async killService(): Promise<void> {
@@ -756,7 +762,9 @@ export class LiveCheckoutTarget {
   }
 
   /** Boot the candidate commit on an ephemeral staging port and replay the production repro payload. */
-  private async stagingProbe(scenarioId: FaultScenarioId): Promise<{ passed: boolean; detail: string }> {
+  private async stagingProbe(
+    scenarioId: FaultScenarioId,
+  ): Promise<{ passed: boolean; detail: string; replay: PatchVerificationResult['stagingReplay'] }> {
     const spec = FAULT_CATALOG[scenarioId];
     const port = await findFreePort();
     const start = resolveCommand(TARGET.start);
@@ -775,17 +783,29 @@ export class LiveCheckoutTarget {
           await sleep(80);
         }
       }
-      if (!up) return { passed: false, detail: 'candidate failed to boot on staging port' };
+      if (!up) return { passed: false, detail: 'candidate failed to boot on staging port', replay: null };
       let last = 0;
       let body: { chargeMinorUnits?: number; error?: string; message?: string } = {};
       for (let i = 0; i < spec.reproAttempts; i++) {
-        const res = await this.callEndpoint(`http://127.0.0.1:${port}`, withSuffix(spec.reproPayload, `stage_${i}`));
-        last = res.status;
-        body = (await res.json().catch(() => ({}))) as typeof body;
+        try {
+          const res = await this.callEndpoint(`http://127.0.0.1:${port}`, withSuffix(spec.reproPayload, `stage_${i}`), 10_000);
+          last = res.status;
+          body = (await res.json().catch(() => ({}))) as typeof body;
+        } catch (err) {
+          // A candidate that crashes or hangs during the replay fails the check instead of stopping verification.
+          const why = (err as Error).name === 'TimeoutError' ? 'no answer within 10 s' : (err as Error).message;
+          return { passed: false, detail: `candidate stopped answering during the staging replay: ${why}`, replay: { httpStatus: 0, error: why } };
+        }
       }
       const passed = last < 500;
       return {
         passed,
+        replay: {
+          httpStatus: last,
+          // The candidate's own response: keep the charge only if it is a real number.
+          ...(typeof body.chargeMinorUnits === 'number' && Number.isFinite(body.chargeMinorUnits) ? { chargeMinorUnits: body.chargeMinorUnits } : {}),
+          ...(typeof body.chargeMinorUnits !== 'number' && (body.error || body.message) ? { error: `${body.error ?? ''}: ${body.message ?? ''}`.replace(/^: |: $/g, '') } : {}),
+        },
         detail: passed
           ? `staging :${port} replayed production payload -> HTTP ${last}${body.chargeMinorUnits !== undefined ? ` charge=${body.chargeMinorUnits}` : ''}`
           : `staging :${port} still fails -> HTTP ${last} ${body.error ?? ''}: ${body.message ?? ''}`.trim(),
@@ -819,10 +839,12 @@ export class LiveCheckoutTarget {
     preMatrix: PatchVerificationResult['testMatrix'] = [],
   ): Promise<PatchVerificationResult> {
     const tests = await this.runServiceTests();
-    const probe = tests.green ? await this.stagingProbe(scenarioId) : { passed: false, detail: 'skipped: test suite red' };
+    const probe = tests.green
+      ? await this.stagingProbe(scenarioId)
+      : { passed: false, detail: 'skipped: test suite red', replay: null };
     const matrix = [
       ...preMatrix,
-      { name: `Fault ${scenarioId} no longer reproduces on candidate (staging probe)`, ...probe },
+      { name: `Fault ${scenarioId} no longer reproduces on candidate (staging probe)`, passed: probe.passed, detail: probe.detail },
       ...tests.matrix,
     ];
     const allPassed = repro.confirmed && matrix.every((t) => t.passed);
@@ -848,6 +870,7 @@ export class LiveCheckoutTarget {
       testMatrix: matrix,
       allPassed,
       testRunOutput: tests.raw,
+      stagingReplay: probe.replay,
       author,
       source,
     };
@@ -928,6 +951,7 @@ export class LiveCheckoutTarget {
         testMatrix: [{ name: 'patch applies cleanly to the regressed working copy (git apply --check)', passed: false, detail: applyDetail }],
         allPassed: false,
         testRunOutput: applyDetail,
+        stagingReplay: null,
         author: submission.author,
         source: 'external-coder',
       };
