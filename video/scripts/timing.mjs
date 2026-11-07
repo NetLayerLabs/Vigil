@@ -15,7 +15,7 @@ const FPS = 30, MAX = 5250; // 2:55 ceiling
 const END_HOLD = { close: 130, turn: 30, open: 24 }; // min frames after last word, per scene
 const TRIM_ORDER = ["switch", "problem", "chat", "break", "verify", "unique", "ship", "gap", "open"];
 // Words the voice is given phonetically (script.json `say`) are shown as written.
-const DISPLAY = {};
+const DISPLAY = { lyve: "Live" };
 const show = (w) => { const k = w.toLowerCase().replace(/[^a-z]/g, ""); return DISPLAY[k] ? w.replace(/[A-Za-z]+/, DISPLAY[k]) : w; };
 const script = JSON.parse(readFileSync(join(ROOT, "script.json"), "utf8"));
 const dur = (f) => parseFloat(execFileSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "default=nw=1:nk=1", f]).toString());
