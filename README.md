@@ -334,7 +334,7 @@ This is the offline preview: an embedded server that speaks the Switch protocol 
 git clone https://github.com/NetLayerLabs/Vigil.git
 cd Vigil
 npm install
-npm test           # 19 tests, about 11 seconds
+npm test           # 22 tests, about 20 seconds
 npm run build      # server to dist/server, UI to dist/ui
 npm start          # http://localhost:4010 and checkout-api on :4020
 ```
@@ -350,6 +350,7 @@ For development, `npm run dev` runs the server from source with `tsx`, and `npm 
 | `VIGIL_PORT` (default `4010`), `CHECKOUT_API_PORT` (default `4020`) | Where the War Room and the target service listen. |
 | `SWITCH_CONSOLE_CODER_HANDLE` | Your coding agent's name in `#vigil-hotfix`. When set, the sentinel mentions it and the patch mode defaults to `external`. |
 | `VIGIL_PATCH_MODE` | `auto` (Vigil's patcher writes the fix) or `external` (your coding agent does). Also switchable at runtime. |
+| `VIGIL_EXTERNAL_TIMEOUT_MS` (default `300000`, `0` turns it off) | External mode: if the coding agent has said nothing in `#vigil-hotfix` this long after the hand-off, Vigil's patcher writes the fix itself and says so in the room. Same checks, same human gate. |
 | `CHECKOUT_TRAFFIC_INTERVAL_MS` (default `250`, `0` disables) | Milliseconds between synthetic checkout requests. |
 | `VIGIL_CHAT_URL` | Mode B: the messaging app's team URL (for example `https://vigil-chat.netlayerlabs.com/vigil`). The War Room links each room to `<url>/channels/<room>`, because humans post and approve there. |
 | `VIGIL_TARGET` (default `targets/checkout-api.target.json`) | The target manifest: which service Vigil guards. See [`targets/README.md`](targets/README.md). |
@@ -362,7 +363,7 @@ For development, `npm run dev` runs the server from source with `tsx`, and `npm 
 The full list with comments is in [`.env.example`](.env.example). Two scripts help outside the UI: `npm run inject:fault jpy_zero_decimal_500` ships a bad release from a terminal, and `npm run onboard:switch` registers the agents in Mode B.
 
 **Test status (Nov 6, 2026):**
-- **Vigil:** `Tests  19 passed (19)` in about 11 s, across 5 files. They cover the template schema; the WebSocket handshake, `ping`/`pong`, `409` lease contention, `403` document authorship and `taken_over` fencing; disguised agent senders; external-coder routing with a rejected non-fix and room-document policy; commander failover; a full incident through promotion; an emergency rollback; monitoring-tool alerts and their authentication; incidents surviving a restart; a target cloned from its own git repository; the gate's fail-closed sender rules, handle-based approvers and discarded candidates; an incident staying open when canaries fall short of the policy; and Vigil stopping its service on `SIGTERM`.
+- **Vigil:** `Tests  22 passed (22)` in about 20 s, across 6 files. They cover the template schema; the WebSocket handshake, `ping`/`pong`, `409` lease contention, `403` document authorship and `taken_over` fencing; disguised agent senders; external-coder routing with a rejected non-fix and room-document policy; commander failover; a full incident through promotion; an emergency rollback; monitoring-tool alerts and their authentication; incidents surviving a restart; a target cloned from its own git repository; the gate's fail-closed sender rules, handle-based approvers and discarded candidates; an incident staying open when canaries fall short of the policy; approvals counted only in the releases room; Vigil's patcher taking over when the coding agent stays silent, and leaving it alone when it has answered; and Vigil stopping its service on `SIGTERM`.
 - **checkout-api on `v2.13.2`:** `pass 5, fail 0` with `node --import tsx --test test/cartPricing.test.ts`.
 - **Each regression fails only its own tests:** the JPY patch fails the JPY and KRW tests (3 pass, 2 fail), the promo patch fails the promo test (4 pass, 1 fail), and the inventory patch fails the fraud-decline lock test (4 pass, 1 fail).
 
@@ -394,7 +395,7 @@ services/checkout-api/src/           the real service: cartPricing.ts (pricing, 
 services/checkout-api/test/          the service's node:test suite (5 tests)
 services/checkout-api/releases/      the three seeded regression patches
 templates/                           Switch group template (3 rooms) and the per-incident workroom template
-tests/                               Vitest suite (19 tests in 5 files)
+tests/                               Vitest suite (22 tests in 6 files)
 scripts/                             onboard-switch-agents.ts, inject-fault.ts, install-switch-console.sh, setup-coder-user.sh
 public/brand/                        the logo lockup and the favicon set
 ui/                                  React UI: Landing.tsx (/), App.tsx (/app), theme.css, landing.css, warroom.css, VigilMark.tsx

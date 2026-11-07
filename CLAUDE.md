@@ -32,6 +32,8 @@ triage, verification and the human release gate; your job is the fix itself.
   ```
 - Keep the diff surgical (the room policy caps changed lines; default 40). Never touch `.env`,
   auth keys, migrations, or deployment state.
+- Answer in the room as soon as you pick the incident up (one line such as "On it" is enough). If you post nothing
+  within 5 minutes of the escalation, `@vigil-patcher` takes `patch-author` and writes the fix itself.
 - Hand off to `@vigil-patcher` in one of three ways:
   - **Edit in place, then ask for verification (simplest):** leave your edits uncommitted in the working copy
     and post `@vigil-patcher verify INC-xxxx` in `#vigil-hotfix`. The verifier commits them as the candidate.
