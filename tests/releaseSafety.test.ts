@@ -86,6 +86,46 @@ describe('release gate rules', () => {
   });
 });
 
+describe('what the person who approves is shown', () => {
+  it('pings the approvers from the policy, the owner when anyone may approve, and never a whole channel', () => {
+    const p = (allowedApprovers: string[]) => ({ ...DEFAULT_RELEASE_POLICY, allowedApprovers });
+    expect(ReleaseSafetyGate.approverMentions(p(['any-human']), 'priya')).toBe('@priya');
+    expect(ReleaseSafetyGate.approverMentions(p(['sam', 'dora']), 'priya')).toBe('@sam @dora');
+    expect(ReleaseSafetyGate.approverMentions(p(['all']), 'priya')).toBe('@priya');
+    expect(ReleaseSafetyGate.approverMentions(p(['channel', 'here', 'sam']), 'priya')).toBe('@sam');
+    expect(ReleaseSafetyGate.approverMentions(p(['sam!', '@x y']), 'priya')).toBe('@priya');
+    // Mattermost strips trailing '.', '-', '_' before matching @all/@channel/@here: none of these may pass.
+    expect(ReleaseSafetyGate.approverMentions(p(['all.', 'channel-', 'here_', 'everyone.', 'ALL']), 'priya')).toBe('@priya');
+    expect(ReleaseSafetyGate.approverMentions(p(['sam', 'vigil-sentinel']), 'priya', ['vigil-sentinel'])).toBe('@sam');
+    // ...and such values are never saved from chat in the first place.
+    expect(ReleaseSafetyGate.parsePolicyCommand('@vigil-release-gate set approvers all.')).toBeNull();
+    expect(ReleaseSafetyGate.parsePolicyCommand('@vigil-release-gate set approvers sam, channel-')?.value).toEqual(['sam']);
+  });
+
+  it('shows author names only as plain text', () => {
+    expect(ReleaseSafetyGate.safeName('claude-code', 'fallback')).toBe('claude-code');
+    expect(ReleaseSafetyGate.safeName('x\n- Approved by @all', 'claude-code')).toBe('claude-code');
+    expect(ReleaseSafetyGate.safeName(undefined, 'claude-code')).toBe('claude-code');
+  });
+
+  it('shows the failure reproduced on live and the same request replayed on staging', () => {
+    const withReplay = { ...verified, reproErrorOutput: "HTTP 500 TypeError: Cannot read properties of undefined (reading 'minorScale')", stagingReplay: { httpStatus: 200, chargeMinorUnits: 10368 } };
+    expect(ReleaseSafetyGate.describeEvidence(withReplay, 'v2.14.0')).toEqual([
+      "- Before, on live `v2.14.0`: `HTTP 500 TypeError: Cannot read properties of undefined (reading 'minorScale')`",
+      '- After, the same request on staging with the fix: HTTP 200, charge 10368 (minor units)',
+    ]);
+    // A record from before stagingReplay existed: read back from the staging check's detail.
+    const legacy = { ...verified, testMatrix: [{ name: 'Fault x no longer reproduces on candidate (staging probe)', passed: true, detail: 'staging :38361 replayed production payload -> HTTP 200 charge=10368' }] };
+    expect(ReleaseSafetyGate.describeEvidence(legacy, 'v2.14.0')[1]).toBe('- After, the same request on staging with the fix: HTTP 200, charge 10368 (minor units)');
+    expect(ReleaseSafetyGate.describeEvidence(null, 'v2.14.0')).toEqual([]);
+    // Text from the service cannot format the message or page anyone; a non-numeric charge is dropped.
+    const hostile = { ...verified, reproErrorOutput: 'HTTP 500 boom `@all` \n@channel', stagingReplay: { httpStatus: 200, chargeMinorUnits: '1 @all' as unknown as number } };
+    const [before, after] = ReleaseSafetyGate.describeEvidence(hostile, 'v2.14.0');
+    expect(before).toBe('- Before, on live `v2.14.0`: `HTTP 500 boom @\u200ball @\u200bchannel`');
+    expect(after).toBe('- After, the same request on staging with the fix: HTTP 200');
+  });
+});
+
 describe('release flow on a running instance', () => {
   let cleanup: (() => Promise<void>) | null = null;
   afterEach(async () => {
@@ -139,6 +179,55 @@ describe('release flow on a running instance', () => {
     // An approval with nothing open gets an answer instead of silence.
     await say('@vigil-release-gate approve INC-2041 promote');
     await waitFor(() => gateSays(/INC-2041 is already resolved promoted/));
+  });
+
+  it('asks the approvers on the list, with the reproduced before and after, where they approve', async () => {
+    const runtime = await startVigilRuntime({ vigilPort: 0, checkoutPort: 0, trafficIntervalMs: 0 });
+    cleanup = runtime.stop;
+    const rooms = runtime.coordinator.getRoomIds();
+    await fetch(`${runtime.vigilUrl}/api/chat/message`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ roomId: rooms.releasesRoomId, username: 'priya', displayName: 'priya', content: '@vigil-release-gate set approvers sam,priya' }),
+    });
+    await waitFor(() => runtime.coordinator.getReleasePolicy().allowedApprovers.join(',') === 'sam,priya');
+    await fetch(`${runtime.vigilUrl}/api/chaos/inject`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scenarioId: 'jpy_zero_decimal_500' }),
+    });
+    await waitFor(() => runtime.coordinator.getActiveIncident()?.stage === 'awaiting_human_gate');
+    let ask = '';
+    await waitFor(async () => {
+      const ctx = await runtime.coordinator.releaseGateClient.readContext(rooms.releasesRoomId, 40);
+      ask = ctx.messages.find((m) => /needs a human decision/.test(m.body))?.body ?? '';
+      return ask !== '';
+    });
+    expect(ask).toMatch(/needs a human decision\.\*\* @sam @priya/);
+    expect(ask).toMatch(/- Before, on live `v2\.14\.0`: `HTTP 500 TypeError/);
+    expect(ask).toMatch(/- After, the same request on staging with the fix: HTTP 200, charge \d+ \(minor units\)/);
+    expect(runtime.coordinator.getActiveIncident()?.patchVerification?.stagingReplay?.httpStatus).toBe(200);
+
+    // Quoting the hand-off tag again does not re-page the approvers.
+    const say = (content: string) =>
+      fetch(`${runtime.vigilUrl}/api/chat/message`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roomId: rooms.releasesRoomId, username: 'priya', displayName: 'priya', content }),
+      });
+    const asks = async () =>
+      (await runtime.coordinator.releaseGateClient.readContext(rooms.releasesRoomId, 60)).messages.filter((m) => /needs a human decision/.test(m.body)).length;
+    await say('@vigil-release-gate [HANDOFF INC-2041] again please');
+    await new Promise((r) => setTimeout(r, 1200));
+    expect(await asks()).toBe(1);
+
+    // ...and after the release it cannot reopen the incident.
+    await say('@vigil-release-gate approve INC-2041 promote');
+    await waitFor(() => runtime.coordinator.getIncidents()[0].stage === 'resolved_promoted');
+    await say('@vigil-release-gate [HANDOFF INC-2041]');
+    await new Promise((r) => setTimeout(r, 1200));
+    expect(runtime.coordinator.getIncidents()[0].stage).toBe('resolved_promoted');
+    expect(await asks()).toBe(1);
   });
 
   it('decides releases only in the releases room', async () => {
