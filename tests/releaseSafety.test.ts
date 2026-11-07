@@ -141,6 +141,33 @@ describe('release flow on a running instance', () => {
     await waitFor(() => gateSays(/INC-2041 is already resolved promoted/));
   });
 
+  it('decides releases only in the releases room', async () => {
+    const runtime = await startVigilRuntime({ vigilPort: 0, checkoutPort: 0, trafficIntervalMs: 0 });
+    cleanup = runtime.stop;
+    const rooms = runtime.coordinator.getRoomIds();
+    const say = (roomId: string, content: string) =>
+      fetch(`${runtime.vigilUrl}/api/chat/message`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roomId, username: 'priya', displayName: 'priya', content }),
+      });
+    await fetch(`${runtime.vigilUrl}/api/chaos/inject`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scenarioId: 'jpy_zero_decimal_500' }),
+    });
+    await waitFor(() => runtime.coordinator.getActiveIncident()?.stage === 'awaiting_human_gate');
+
+    await say(rooms.hotfixRoomId, '@vigil-release-gate approve INC-2041 promote');
+    await new Promise((r) => setTimeout(r, 1500));
+    const inc = runtime.coordinator.getActiveIncident()!;
+    expect(inc.gateDecisions).toHaveLength(0);
+    expect(inc.stage).toBe('awaiting_human_gate');
+
+    await say(rooms.releasesRoomId, '@vigil-release-gate approve INC-2041 promote');
+    await waitFor(() => runtime.coordinator.getIncidents()[0].stage === 'resolved_promoted');
+  });
+
   it('stops the guarded service when Vigil gets SIGTERM', async () => {
     const child = spawn(process.execPath, [path.resolve('dist/server/index.js')], {
       cwd: path.resolve('.'),
