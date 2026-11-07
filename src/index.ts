@@ -110,6 +110,7 @@ export async function startVigilRuntime(opts: {
       process.env.VIGIL_PATCH_MODE === 'external' || process.env.VIGIL_PATCH_MODE === 'auto'
         ? process.env.VIGIL_PATCH_MODE
         : undefined,
+    externalTimeoutMs: process.env.VIGIL_EXTERNAL_TIMEOUT_MS != null && process.env.VIGIL_EXTERNAL_TIMEOUT_MS !== '' ? Number(process.env.VIGIL_EXTERNAL_TIMEOUT_MS) : undefined,
     checkoutService,
     preRegisteredCreds,
     // The embedded server is provisioned over HTTP; a real Switch server through `create_room_from_yaml`.

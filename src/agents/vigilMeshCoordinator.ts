@@ -75,6 +75,12 @@ export interface VigilMeshOptions {
   externalCoderHandle?: string;
   /** `auto`: Vigil's patcher writes the fix. `external`: a coding agent bound via Switch Console (e.g. Claude Code) does; Vigil verifies. */
   patchMode?: PatchMode;
+  /**
+   * External mode: if the coding agent has not said anything in the hotfix room this long after the hand-off,
+   * Vigil's patcher writes the fix itself (same checks, same human gate) so an incident never waits forever.
+   * 0 turns the fallback off. Default 5 minutes.
+   */
+  externalTimeoutMs?: number;
   checkoutService: CheckoutMicroservice;
   /**
    * Keep the incident ledger and the policy audit in this JSON file across restarts. Incidents still
@@ -143,6 +149,7 @@ export class VigilMeshCoordinator {
   }
 
   private persistTimer: NodeJS.Timeout | null = null;
+  private readonly fallbackTimers = new Map<string, NodeJS.Timeout>();
 
   private loadLedger(): void {
     const file = this.opts.ledgerFile;
@@ -526,6 +533,8 @@ export class VigilMeshCoordinator {
   }
 
   public async shutdown(): Promise<void> {
+    for (const t of this.fallbackTimers.values()) clearTimeout(t);
+    this.fallbackTimers.clear();
     await Promise.all([
       ...this.retiredSentinels.map((c) => c.disconnect().catch(() => undefined)),
       this.sentinelClient?.disconnect(),
@@ -832,6 +841,7 @@ export class VigilMeshCoordinator {
               .filter(Boolean)
               .join('\n'),
           );
+          this.scheduleExternalFallback(incidentId, scenarioId, Date.now());
           return;
         }
 
@@ -905,6 +915,49 @@ export class VigilMeshCoordinator {
         }
       }
     });
+  }
+
+  /**
+   * External mode safety net: if the coding agent has posted nothing in the hotfix room since the hand-off
+   * when the timeout fires, Vigil's patcher takes `patch-author` and writes the fix itself. Anything the coder
+   * says (a role claim, a question, `verify`) counts as an answer, so a slow but working coder is never overridden.
+   */
+  private scheduleExternalFallback(incidentId: string, scenarioId: FaultScenarioId, handedOffAt: number): void {
+    const ms = this.opts.externalTimeoutMs ?? 5 * 60_000;
+    if (!ms) return;
+    clearTimeout(this.fallbackTimers.get(incidentId));
+    const timer = setTimeout(() => {
+      this.fallbackTimers.delete(incidentId);
+      void this.runExternalFallback(incidentId, scenarioId, handedOffAt, ms).catch((err: Error) => {
+        console.warn(`[vigil] fallback for ${incidentId} failed: ${err.message}`);
+      });
+    }, ms);
+    timer.unref?.();
+    this.fallbackTimers.set(incidentId, timer);
+  }
+
+  private async runExternalFallback(incidentId: string, scenarioId: FaultScenarioId, handedOffAt: number, ms: number): Promise<void> {
+    const rec = this.incidents.get(incidentId);
+    if (!rec || rec.resolvedAt !== null || rec.stage !== 'reproducing_patching' || rec.patchVerification) return;
+    const hotfixRoomId = this.roomsByRole.hotfixRoomId;
+    const coder = this.getExternalCoderHandle().toLowerCase();
+    const ctx = await this.patcherClient.readContext(hotfixRoomId, 60);
+    const toMs = (t: number) => (t < 1e12 ? t * 1000 : t);
+    const answered = ctx.messages.some(
+      (m) => toMs(m.timestamp) >= handedOffAt - 2000 && [m.sender_name, m.sender].some((x) => String(x ?? '').toLowerCase().includes(coder)),
+    );
+    if (answered) return;
+    const minutes = Math.round(ms / 60_000);
+    rec.patchMode = 'auto';
+    this.opts.onEventUpdate?.();
+    await this.patcherClient.releaseRole(hotfixRoomId, 'red-team-verifier').catch(() => undefined);
+    await this.patcherClient.assumeRole(hotfixRoomId, 'patch-author');
+    await this.patcherClient.postMessage(
+      hotfixRoomId,
+      `**${incidentId}: @${this.getExternalCoderHandle()} has not answered in ${minutes >= 1 ? `${minutes} minute${minutes === 1 ? '' : 's'}` : `${Math.round(ms / 1000)} seconds`}, so I'm writing the fix myself.** I hold \`patch-author\` now. It goes through the same checks, and a person still decides in #${this.teamPrefix}-releases.`,
+    );
+    const verification = await this.opts.checkoutService.reproduceAndStagePatch(incidentId, scenarioId);
+    await this.completeVerificationAndHandoff(incidentId, verification, hotfixRoomId);
   }
 
   /** HTTP intake used by coding agents that call `POST /api/incidents/{id}/stage-patch` (see CLAUDE.md). */
@@ -1248,7 +1301,10 @@ export class VigilMeshCoordinator {
         return;
       }
 
-      // 2. Evaluate an approval or rollback with the release gate (plain code, no model)
+      // 2. Evaluate an approval or rollback with the release gate (plain code, no model). Only #<team>-releases
+      //    decides releases: elsewhere (the hotfix room, a workroom) a message that merely mentions "approve" is
+      //    someone talking about the release, not asking for one, and is left alone.
+      if (event.room_id !== releasesRoomId) return;
       const active = this.getActiveIncident();
       if (!active || active.resolvedAt !== null) {
         if (/\b(approve|ship|execute|rollback)\b/i.test(body)) {
